@@ -25,34 +25,34 @@ pip install -e .
 All commands are available via the CLI app:
 
 ```bash
-python -m dotfile_manager.app <command> [options]
+python -m dotfile-manager <command> [options]
 ```
 
 ### Common Commands
 
 - **Check manifest:**
     ```bash
-    python -m dotfile_manager.app check-settings --manifest-path <path>
+    python -m dotfile-manager check-settings --manifest-path <path>
     ```
 - **Sync with remote:**
     ```bash
-    python -m dotfile_manager.app sync
+    python -m dotfile-manager sync
     ```
 - **Review repository status:**
     ```bash
-    python -m dotfile_manager.app review
+    python -m dotfile-manager review
     ```
 - **Link dotfiles:**
     ```bash
-    python -m dotfile_manager.app link
+    python -m dotfile-manager link
     ```
 - **Import from system:**
     ```bash
-    python -m dotfile_manager.app from-system
+    python -m dotfile-manager from-system
     ```
 - **Download dotfiles from remote:**
     ```bash
-    python -m dotfile_manager.app download --repository-url <url>
+    python -m dotfile-manager download --repository-url <url>
     ```
 
 ## Manifest Example
