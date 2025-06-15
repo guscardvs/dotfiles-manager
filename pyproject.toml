@@ -1,0 +1,34 @@
+[project]
+name = "dotfile-manager"
+version = "0.1.0"
+description = "A tool to manage and synchronize dotfiles across multiple systems."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cyclopts>=3.19.0",
+    "escudeiro>=0.2.3",
+    "gitpython>=3.1.44",
+    "ruamel-yaml>=0.18.14",
+    "termcolor>=3.1.0",
+    "tomlkit>=0.13.3",
+]
+
+
+[project.scripts]
+dotfile-manager = "dotfile_manager.app:app"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.29.4",
+    "ruff>=0.11.13",
+]
+
+[tool.ruff]
+extend-select = ["I", "UP"]
+
+[build-system]
+requires = [
+    "setuptools>=80.9.0",
+    "wheel>=0.45.1",
+]
+build-backend = "setuptools.build_meta"
