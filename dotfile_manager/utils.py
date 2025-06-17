@@ -3,13 +3,14 @@ import os
 import sys
 from collections import deque
 from collections.abc import Callable, Iterable
+from datetime import UTC
 from functools import wraps
 from itertools import islice
 from pathlib import Path
 from typing import Literal
 
 from escudeiro.data import data, field
-from escudeiro.misc import lazymethod
+from escudeiro.misc import TimeZone, lazymethod, now
 from termcolor import colored
 
 LOOKUPS_MAX_SIZE = 10  # Maximum number of lookups allowed for a PartialEntry
@@ -99,18 +100,27 @@ def handle_error[**P, T](func: Callable[P, T]) -> Callable[P, T]:
         except ValidationError as e:
             print(colored(e.message, "red"))
             sys.exit(1)
+        except NotImplementedError:
+            print(colored("This feature is not implemented yet.", "yellow"))
+            print(
+                colored(
+                    "Please open an issue on GitHub to request this feature.", "yellow"
+                )
+            )
+            sys.exit(1)
 
     return wrapper
+
 
 def load_path(loc: str | Path, home: Path | None = None) -> Path:
     """
     Converts a string or Path to a Path object, expanding user directories.
     If the path is relative, it resolves it against the home directory.
-    
+
     Args:
         loc (str | Path): The location to convert.
         home (Path | None): The home directory to resolve relative paths against.
-    
+
     Returns:
         (Path): The resolved Path object.
     """
@@ -125,7 +135,7 @@ def load_path(loc: str | Path, home: Path | None = None) -> Path:
 def merge_dicts(
     left: dict,
     right: dict,
-    on_conflict: Literal['strict', 'left', 'right'],
+    on_conflict: Literal["strict", "left", "right"],
     merge_sequences: bool = True,
 ) -> dict:
     """
@@ -165,7 +175,7 @@ def merge_dicts(
             elif isinstance(value, list | set | tuple) and merge_sequences:
                 left_val = left_curr[key]
                 if isinstance(left_val, list | set | tuple):
-                    type_ = type(value) if on_conflict == 'right' else type(left_val)
+                    type_ = type(value) if on_conflict == "right" else type(left_val)
                     output_curr[key] = type_(itertools.chain(left_val, value))
             elif isinstance(value, dict):
                 if isinstance(left_curr[key], dict):
@@ -175,16 +185,29 @@ def merge_dicts(
                         if lkey not in value
                     }
                     stack.append((left_curr[key], value, output_curr[key]))
-            elif on_conflict not in ('left', 'right'):
+            elif on_conflict not in ("left", "right"):
                 raise ValueError(
-                    'Conflict found when trying to merge dicts',
+                    "Conflict found when trying to merge dicts",
                     key,
                     value,
                     left_curr[key],
                 )
-            elif on_conflict == 'left':
+            elif on_conflict == "left":
                 output_curr[key] = left_curr[key]
             else:
                 output_curr[key] = value
 
     return output
+
+
+timezone = TimeZone(now().astimezone().tzinfo or UTC)
+
+
+def get_timezone() -> TimeZone:
+    """
+    Returns the current timezone.
+
+    Returns:
+        TimeZone: The current timezone.
+    """
+    return timezone

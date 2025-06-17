@@ -17,7 +17,7 @@ from tomlkit.exceptions import TOMLKitError
 from dotfile_manager.utils import ValidationError
 
 from .concepts import ManifestFormat
-from .schema import Manifest
+from .schema import Dotfile, Manifest
 
 yaml_loader = YAML()
 
@@ -133,6 +133,15 @@ def validate_manifest_path(
     Returns:
         tuple[Path, ManifestFormat]: A tuple containing the validated manifest path and its format.
     """
+    # validate if the manifest lacks a file extension
+    if manifest_path.suffix == "":
+        # default to TOML if no extension is provided
+        if manifest_format is ManifestFormat.PRESUMED:
+            manifest_format = ManifestFormat.TOML
+        # rename the file to include the default extension
+        manifest_path = manifest_path.with_suffix(
+            f".{manifest_format}"
+        )
     if not manifest_path.exists():
         raise ValidationError(f"Manifest file does not exist: '{manifest_path}'")
     if not manifest_path.is_file():
@@ -165,3 +174,76 @@ def print_manifest(manifest: Manifest) -> None:
                 "yellow",
             )
         )
+
+def print_dotfiles(manifest: Manifest) -> None:
+    """
+    Prints the dotfiles in the manifest in a human-readable format.
+
+    Args:
+        manifest (Manifest): The manifest containing dotfiles to print.
+    """
+    dotfiles = manifest.dotfiles
+    if not dotfiles:
+        print(colored("No dotfiles found in the manifest.", "yellow"))
+        return
+
+    print(colored("Dotfiles in the manifest:", "blue"))
+    for dotfile in dotfiles:
+        location = resolve_location(dotfile, manifest)
+        dflocation = resolve_dfman_path(dotfile, manifest)
+        if not dflocation.exists():
+            state = "broken, no matching file in dotfile manager folder"
+        elif location.is_symlink():
+            if  dflocation.resolve() != location.resolve():
+                state = "broken, symlink points to a different file"
+            else:
+                state = "linked"
+        elif not location.exists():
+            state = f"unlinked, run `dfman link '{dflocation}'` to link it"
+        else:
+            state = "broken, location exists but is not a symlink"
+
+        print(
+            colored(
+                f"{dotfile.name} -> {dotfile.location} (dflocation: {dotfile.dflocation}, state: {state})",
+                "cyan",
+            )
+        )
+
+def resolve_dfman_path(dotfile: Dotfile, manifest: Manifest) -> Path:
+    """
+    Resolves the path of a dotfile in the manifest.
+
+    Args:
+        dotfile (Dotfile): The dotfile to resolve.
+        manifest (Manifest): The manifest containing the dotfile.
+
+    Returns:
+        (Path): The resolved path of the dotfile.
+    """
+
+    dflocation = Path(dotfile.dflocation or dotfile.location).expanduser()
+    if not dflocation.is_absolute():
+        dflocation = manifest.root / dflocation
+    elif not dflocation.relative_to(manifest.root):
+        dflocation = manifest.root / dflocation.relative_to(Path.home())
+    
+    return dflocation
+
+def resolve_location(dotfile: Dotfile, manifest: Manifest) -> Path:
+    """
+    Resolves the location of a dotfile in the manifest.
+
+    Args:
+        dotfile (Dotfile): The dotfile to resolve.
+        manifest (Manifest): The manifest containing the dotfile.
+
+    Returns:
+        (Path): The resolved location of the dotfile.
+    """
+    location = Path(dotfile.location).expanduser()
+    if not location.is_absolute():
+        location = Path.home() / location
+    elif location.is_relative_to(manifest.root):
+        location = Path.home() / location.relative_to(manifest.root)
+    return location.expanduser()

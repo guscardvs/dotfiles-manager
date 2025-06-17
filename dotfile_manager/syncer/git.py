@@ -1,17 +1,20 @@
 import shutil
+from collections.abc import Generator
+from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Self
 
 from escudeiro.data import data
 from escudeiro.lazyfields import lazyfield
-from escudeiro.misc import timezone
+from escudeiro.misc import to_snake
 from git import Repo
 from termcolor import colored
 
 from dotfile_manager.manifest.concepts import ManifestFormat
-from dotfile_manager.manifest.loader import dumpers, loaders, validate_manifest_path
+from dotfile_manager.manifest.loader import loaders, validate_manifest_path
 from dotfile_manager.manifest.schema import Manifest
-from dotfile_manager.utils import ValidationError
+from dotfile_manager.utils import ValidationError, get_timezone
 
 
 @data
@@ -59,31 +62,15 @@ class GitSyncer:
             manifest=manifest,
         )
 
-    def _verify_manifest_file(self) -> None:
-        """
-        Verifies that the manifest file exists in the repository path.
-        Raises an error if the manifest file is not found.
-        """
-        manifest_file = self.repository_path / f"dfman.{self.manifest.original_format}"
-        if not manifest_file.exists():
-            manifest_file.touch()
-            manifest_file.write_text(
-                dumpers[self.manifest.original_format](self.manifest)
-            )
-            print(colored(f"Manifest file {manifest_file} created.", "yellow"))
-
-        print(colored(f"Manifest file {manifest_file} verified.", "green"))
-
     def save(self) -> None:
         """
         Synchronizes the local repository with the remote repository.
         Commits changes and pushes them if push_after_commit is True.
         """
-        self._verify_manifest_file()
         repo = self.instance
         repo.git.add(A=True)
         commit_message = self.commit_message.format(
-            timestamp=timezone.now().isoformat(timespec="seconds")
+            timestamp=get_timezone().now().isoformat(timespec="seconds")
         )
         repo.index.commit(commit_message)
 
@@ -91,7 +78,7 @@ class GitSyncer:
             origin = repo.remote(name="origin")
             origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
         if self.pinned_hash:
-            raise ValueError("Cannot sync changes with a pinned hash.")
+            raise ValidationError("Cannot sync changes with a pinned hash.")
         print(
             colored(
                 f"Repository {self.repository_path} synchronized successfully.", "green"
@@ -104,7 +91,7 @@ class GitSyncer:
         """
         repo = self.instance
         origin = repo.remote(name="origin")
-        origin.pull(refspec=f"{self.repository_branch}")
+        origin.pull(refspec=f"{self.repository_branch}", rebase=True)
         print(
             colored(f"Repository {self.repository_path} pulled successfully.", "green")
         )
@@ -132,6 +119,7 @@ class GitSyncer:
             print(colored("There are changes to commit.", "yellow"))
 
     @classmethod
+    @contextmanager
     def download(
         cls,
         repository_url: str,
@@ -139,7 +127,7 @@ class GitSyncer:
         repository_path: Path,
         manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
         pinned_hash: str | None = None,
-    ) -> tuple[Self, Path]:
+    ) -> Generator[tuple[Self, Path]]:
         """
         Downloads the repository from the specified URL and branch.
         Initializes a GitSyncer instance with the downloaded repository.
@@ -154,7 +142,7 @@ class GitSyncer:
         Returns:
             tuple[Self, Path]: A tuple containing the GitSyncer instance and the path to the manifest file.
         """
-        
+
         repo = Repo.clone_from(
             repository_url,
             repository_path,
@@ -191,16 +179,97 @@ class GitSyncer:
             manifest = loaders[manifest_format](manifest_path)
             if manifest.root != repository_path:
                 shutil.move(
-                    repository_path, manifest.root,
+                    repository_path,
+                    manifest.root,
                 )
-            return cls(
-                repository_url=repository_url,
-                repository_path=repository_path,
-                manifest=manifest,
-                repository_branch=repository_branch,
-                pinned_hash=pinned_hash,
-            ), manifest_path
+            yield (
+                cls(
+                    repository_url=repository_url,
+                    repository_path=repository_path,
+                    manifest=manifest,
+                    repository_branch=repository_branch,
+                    pinned_hash=pinned_hash,
+                ),
+                manifest_path,
+            )
         except Exception as e:
             if repository_path.exists():
                 shutil.rmtree(repository_path, ignore_errors=True)
             raise e
+
+    def revert(
+        self,
+        refspec: str,
+        backup_branch: str | None,
+    ) -> None:
+        """Reverts the repository to a specific commit or branch.
+        Args:
+            refspec (str): The commit hash or branch name to revert to.
+            backup_branch (str | None): Optional name for the backup branch.
+                If not provided, a default backup branch name will be used.
+
+        """
+
+        if self.pinned_hash:
+            raise ValidationError("Cannot revert changes with a pinned hash.")
+
+        backup_branch = (
+            backup_branch
+            or f"backup_{to_snake(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))}"
+        )
+        repo = self.instance
+        if backup_branch not in repo.branches:
+            repo.git.checkout("-b", backup_branch)
+        else:
+            repo.git.checkout(backup_branch)
+        if self.push_after_commit:
+            origin = repo.remote(name="origin")
+            origin.push(
+                refspec=f"{backup_branch}:{backup_branch}",
+                force=True,
+            )
+        repo.git.checkout(self.repository_branch)
+        commits_to_revert = list(repo.iter_commits(f"{refspec}..HEAD"))
+        if not commits_to_revert:
+            print(colored("No commits to revert.", "yellow"))
+            return
+        repo.git.revert(
+            *[commit.hexsha for commit in commits_to_revert],
+            no_edit=True,
+        )
+
+        # save and push changes
+        if self.push_after_commit:
+            origin = repo.remote(name="origin")
+            origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        print(
+            colored(
+                f"Repository {self.repository_path} reverted to {refspec} (via revert commits) and changes pushed successfully.",
+                "green",
+            )
+        )
+        if backup_branch != self.repository_branch:
+            print(
+                colored(
+                    f"Backup branch {backup_branch} created with the state before the revert.",
+                    "yellow",
+                )
+            )
+
+    def log(self, limit: int = 10) -> None:
+        """
+        Prints the commit log of the repository.
+
+        Args:
+            limit (int): The number of commits to show in the log. Defaults to 10.
+        """
+        repo = self.instance
+        log_entries = repo.git.log(
+            "--pretty=format:%h - %an, %ar : %s", n=limit
+        ).splitlines()
+        if not log_entries:
+            print(colored("No commits found in the repository.", "yellow"))
+            return
+        print(colored("Commit Log:", "blue"))
+        for entry in log_entries:
+            print(colored(entry, "green"))
