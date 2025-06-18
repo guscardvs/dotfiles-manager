@@ -28,8 +28,24 @@ class GitSyncer:
     manifest: Manifest
     repository_branch: str = "main"
     commit_message: str = "Sync dotfiles {timestamp}"
-    push_after_commit: bool = True
     pinned_hash: str | None = None
+
+    @staticmethod
+    def init_git(path: Path) -> Repo:
+        """
+        Initializes a git repository at the specified path.
+        If the repository already exists, it returns the existing Repo instance.
+        """
+        if not (path / ".git").exists():
+            path.mkdir(parents=True, exist_ok=True)
+            return Repo.init(path)
+        return Repo(path)
+
+    def __post_init__(self) -> None:
+        if not self.repository_url:
+            raise ValidationError(
+                "Repository URL cannot be empty, fix your configuration."
+            )
 
     @lazyfield
     def instance(self) -> Repo:
@@ -57,10 +73,17 @@ class GitSyncer:
             repository_url=manifest.repository_url,
             repository_path=manifest.root,
             repository_branch=manifest.repository_branch,
-            push_after_commit=manifest.push_after_commit,
             pinned_hash=manifest.pinned_hash,
             manifest=manifest,
         )
+
+    def apply(self, message: str | None) -> None:
+        repo = self.instance
+        repo.git.add(A=True)
+        commit_message = message or self.commit_message.format(
+            timestamp=get_timezone().now().isoformat(timespec="seconds")
+        )
+        repo.index.commit(commit_message)
 
     def save(self) -> None:
         """
@@ -68,15 +91,8 @@ class GitSyncer:
         Commits changes and pushes them if push_after_commit is True.
         """
         repo = self.instance
-        repo.git.add(A=True)
-        commit_message = self.commit_message.format(
-            timestamp=get_timezone().now().isoformat(timespec="seconds")
-        )
-        repo.index.commit(commit_message)
-
-        if self.push_after_commit:
-            origin = repo.remote(name="origin")
-            origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        origin = repo.remote(name="origin")
+        origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
         if self.pinned_hash:
             raise ValidationError("Cannot sync changes with a pinned hash.")
         print(
@@ -222,12 +238,11 @@ class GitSyncer:
             repo.git.checkout("-b", backup_branch)
         else:
             repo.git.checkout(backup_branch)
-        if self.push_after_commit:
-            origin = repo.remote(name="origin")
-            origin.push(
-                refspec=f"{backup_branch}:{backup_branch}",
-                force=True,
-            )
+        origin = repo.remote(name="origin")
+        origin.push(
+            refspec=f"{backup_branch}:{backup_branch}",
+            force=True,
+        )
         repo.git.checkout(self.repository_branch)
         commits_to_revert = list(repo.iter_commits(f"{refspec}..HEAD"))
         if not commits_to_revert:
@@ -239,9 +254,8 @@ class GitSyncer:
         )
 
         # save and push changes
-        if self.push_after_commit:
-            origin = repo.remote(name="origin")
-            origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        origin = repo.remote(name="origin")
+        origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
         print(
             colored(
                 f"Repository {self.repository_path} reverted to {refspec} (via revert commits) and changes pushed successfully.",

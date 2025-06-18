@@ -202,9 +202,12 @@ class PureLinker:
                 continue
             if not dfloc.exists():
                 dfloc.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(dfloc, "wb") as f:
-                f.write(file.read_bytes())
+            if file.is_file():
+                shutil.move(file, dfloc)
+            else:
+                # If it's a directory, copy it instead of moving
+                shutil.copytree(file, dfloc, dirs_exist_ok=True)
+                shutil.rmtree(file, ignore_errors=True)
             self.manifest.dotfiles.append(dotfile)
 
         print(colored("Manifest updated with current system's dotfiles.", "green"))
@@ -382,7 +385,10 @@ class PureLinker:
                 print(colored(f"File {file} does not exist. Skipping backup.", "red"))
                 continue
             backup_file = file.with_suffix(file.suffix + ".bak")
-            shutil.copy(file, backup_file)
+            if file.is_file():
+                shutil.copy(file, backup_file)
+            else:
+                shutil.copytree(file, backup_file, dirs_exist_ok=True)
             backups.append((file, backup_file))
             print(colored(f"Backed up {file} to {backup_file}", "green"))
         return backups
@@ -406,8 +412,39 @@ class PureLinker:
                         f"Original file {original} exists. Overwriting it.", "yellow"
                     )
                 )
-            shutil.copy(backup, original)
+            if backup.is_file():
+                shutil.move(backup, original)
+            else:
+                if original.exists() and original.is_dir():
+                    print(
+                        colored(
+                            f"Original {original} is a directory. Removing it before restoring.",
+                            "yellow",
+                        )
+                    )
+                    shutil.rmtree(original, ignore_errors=True)
+                shutil.copytree(
+                    backup, original, dirs_exist_ok=True
+                )
+                shutil.rmtree(backup, ignore_errors=True)
             print(colored(f"Restored {original} from {backup}", "green"))
+
+    def delete_backups(self, backups: list[tuple[Path, Path]]) -> None:
+        """
+        Delete the specified backup files.
+
+        Args:
+            backups (list[tuple[Path, Path]]): A list of tuples containing the original file and its backup.
+        """
+        for original, backup in backups:
+            if not backup.exists():
+                print(colored(f"Backup {backup} does not exist. Skipping deletion.", "red"))
+                continue
+            if backup.is_file():
+                backup.unlink()
+            else:
+                shutil.rmtree(backup, ignore_errors=True)
+            print(colored(f"Deleted backup {backup} for {original}", "green"))
 
     def persist_links(self) -> None:
         """

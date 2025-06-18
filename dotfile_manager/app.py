@@ -3,9 +3,10 @@ import subprocess
 import traceback
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Annotated
 
 import questionary
-from cyclopts import App
+from cyclopts import App, Parameter
 from escudeiro.misc import next_or
 from termcolor import colored
 
@@ -20,9 +21,10 @@ from dotfile_manager.manifest.loader import (
     resolve_dfman_path,
     validate_manifest_path,
 )
-from dotfile_manager.manifest.schema import Dotfile
+from dotfile_manager.manifest.schema import Dotfile, Manifest
 from dotfile_manager.syncer.git import GitSyncer
 from dotfile_manager.utils import (
+    PartialEntry,
     ValidationError,
     configdir,
     get_timezone,
@@ -61,6 +63,7 @@ def check(
 def sync(
     manifest_path: Path = configdir() / "dfman",
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
     pull: bool = True,
     save: bool = True,
 ):
@@ -70,6 +73,7 @@ def sync(
     Args:
         manifest_path (Path): The path to the manifest file.
         manifest_format (ManifestFormat): The format of the manifest file.
+        message (str | None): The commit message to use when saving changes.
         pull (bool): Whether to pull changes from the remote repository.
         save (bool): Whether to save changes to the remote repository.
     """
@@ -82,6 +86,7 @@ def sync(
     if pull:
         syncer.pull()
     if save:
+        syncer.apply(message)
         syncer.save()
     if not pull and not save:
         print(
@@ -151,13 +156,13 @@ def link(
             rel_df = df.relative_to(Path.home())
         else:
             rel_df = df
-        df = next_or(
+        instance = next_or(
             selected
             for selected in manifest.dotfiles
             if selected.name == df
             or selected.location in map(Path.as_posix, [rel_df, df])
         )
-        if df is None:
+        if instance is None:
             print(
                 colored(
                     f"Dotfile {df} not found in the manifest. Skipping.",
@@ -165,7 +170,7 @@ def link(
                 )
             )
         else:
-            dfs.append(df)
+            dfs.append(instance)
     if not dfs:
         print(colored("No dotfiles to link.", "yellow"))
         return
@@ -187,6 +192,7 @@ def from_system(
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     dotfiles: Sequence[str | Path] = USUAL_DOTFILES,
     sync: bool = True,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
 ):
     """
     Create managed dotfiles from the system's dotfiles.
@@ -197,6 +203,7 @@ def from_system(
         manifest_format (ManifestFormat): The format of the manifest file.
         dotfiles (Sequence[str | Path]): A sequence of dotfiles to create.
         sync (bool): Whether to sync the manifest after creating dotfiles.
+        message (str | None): The commit message to use when saving changes.
     """
     if dotfiles is USUAL_DOTFILES:
         print(
@@ -232,6 +239,7 @@ def from_system(
         persist_changes(manifest, manifest_path)
         if sync:
             syncer = GitSyncer.from_manifest(manifest)
+            syncer.apply(message)
             syncer.save()
     except Exception as e:
         if not isinstance(e, ValidationError):
@@ -242,7 +250,20 @@ def from_system(
             print(colored("Restoring backups...", "yellow"))
             linker.restore_backups(backups)
         return
-
+    else:
+        if backups:
+            print(
+                colored(
+                    "Backups created for existing dotfiles: "
+                    + ", ".join(f"{src} -> {dst}" for src, dst in backups),
+                    "yellow",
+                )
+            )
+            if questionary.confirm(
+                "Do you want to delete the backups? (y/n)",
+                default=True,
+            ).ask():
+                linker.delete_backups(backups)
     print(colored("Manifest updated with system dotfiles.", "green"))
 
 
@@ -304,6 +325,7 @@ def edit_file(
     manifest_path: Path = configdir() / "dfman",
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
 ):
     """
     Edit a file using the specified editor and create a symlink to it.
@@ -315,6 +337,7 @@ def edit_file(
         manifest_path (Path): The path to the manifest file.
         manifest_format (ManifestFormat): The format of the manifest file.
         sync (bool): Whether to sync the manifest after editing the file.
+        message (str | None): The commit message to use when saving changes.
     """
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
@@ -417,6 +440,14 @@ def edit_file(
     manifest.dotfiles.append(dotfile)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
+        message = (
+            message
+            or questionary.text(
+                "Enter a commit message for the changes made to the manifest:",
+                default=f"Added dotfile {dotfile.name} at {created_at}",
+            ).ask()
+        )
+        syncer.apply(message)
         syncer.save()
 
 
@@ -427,6 +458,7 @@ def edit_manifest(
     manifest_path: Path = configdir() / "dfman",
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
 ):
     """
     Edit the manifest file using the specified editor.
@@ -435,6 +467,8 @@ def edit_manifest(
         editor (str | None): The editor to use for editing the manifest file.
         manifest_path (Path): The path to the manifest file.
         manifest_format (ManifestFormat): The format of the manifest file.
+        sync (bool): Whether to sync the manifest after editing.
+        message (str | None): The commit message to use when saving changes.
     """
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
@@ -469,6 +503,14 @@ def edit_manifest(
     new_manifest = loaders[manifest_format](manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(new_manifest)
+        message = (
+            message
+            or questionary.text(
+                "Enter a commit message for the changes made to the manifest:",
+                default="Edited manifest file.",
+            ).ask()
+        )
+        syncer.apply(message)
         syncer.save()
 
 
@@ -538,6 +580,7 @@ def remove(
     manifest_path: Path = configdir() / "dfman",
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
 ):
     """
     Remove dotfiles from the manifest and unlink them.
@@ -548,6 +591,7 @@ def remove(
         manifest_path (Path): The path to the manifest file.
         manifest_format (ManifestFormat): The format of the manifest file.
         sync (bool): Whether to sync the manifest after removing dotfiles.
+        message (str | None): The commit message to use when saving changes.
     """
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
@@ -563,13 +607,13 @@ def remove(
             rel_df = df.relative_to(Path.home())
         else:
             rel_df = df
-        df = next_or(
+        instance = next_or(
             selected
             for selected in manifest.dotfiles
             if selected.name == df
             or selected.location in map(Path.as_posix, [rel_df, df])
         )
-        if df is None:
+        if instance is None:
             print(
                 colored(
                     f"Dotfile {df} not found in the manifest. Skipping.",
@@ -577,7 +621,7 @@ def remove(
                 )
             )
         else:
-            dfs.append(df)
+            dfs.append(instance)
 
     if not dfs:
         print(colored("No dotfiles to remove.", "yellow"))
@@ -611,6 +655,14 @@ def remove(
     persist_changes(manifest, manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
+        message = (
+            message
+            or questionary.text(
+                "Enter a commit message for the changes made to the manifest:",
+                default=f"Removed dotfiles: {', '.join(df.name for df in dfs)}",
+            ).ask()
+        )
+        syncer.apply(message)
         syncer.save()
 
 
@@ -640,6 +692,7 @@ def map_orphaned_files(
     manifest_path: Path = configdir() / "dfman",
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
 ):
     """
     Find and map orphaned files in the manifest root.
@@ -649,6 +702,8 @@ def map_orphaned_files(
     Args:
         manifest_path (Path): The path to the manifest file.
         manifest_format (ManifestFormat): The format of the manifest file.
+        sync (bool): Whether to sync the manifest after mapping orphaned files.
+        message (str | None): The commit message to use when saving changes.
     """
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
@@ -663,9 +718,15 @@ def map_orphaned_files(
     persist_changes(manifest, manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
+        message = (
+            message
+            or questionary.text(
+                "Enter a commit message for the changes made to the manifest:",
+                default="Mapped orphaned files.",
+            ).ask()
+        )
+        syncer.apply(message)
         syncer.save()
-    with open(manifest_path, "w") as f:
-        f.write(dumpers[manifest_format](manifest))
 
 
 @app.command
@@ -776,3 +837,130 @@ def exec_(
     else:
         with open(dfloc_path) as f:
             print(colored(f.read(), "green"))
+
+
+@app.command
+@handle_error
+def init(ask: bool = True):
+    """
+    Initialize the dotfile manager.
+    This command will create the default manifest file and set up the dotfile manager.
+
+    Args:
+        ask (bool): Whether to ask for confirmation before initializing.
+    """
+    if not ask:
+        print(
+            colored(
+                "Skipping questionaire. Initializing dotfile manager...",
+                "yellow",
+            )
+        )
+        manifest_format = ManifestFormat.TOML
+        manifest_path = configdir() / "dfman"
+        if manifest_path.exists():
+            print(
+                colored(
+                    f"Manifest file {manifest_path} already exists. Please remove it or use a different path.",
+                    "yellow",
+                )
+            )
+            return
+        manifest_path = manifest_path.with_suffix(f".{manifest_format.value}")
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest = Manifest(
+            root=Path.home() / ".dotfiles",
+            repository_url="",
+            original_format=manifest_format,
+            extra_paths=[],
+            default_terminal="",
+            default_editor="",
+            default_shell=PartialEntry(
+                "bash",
+                map(Path, ("/usr/bin", "/bin", "/usr/local/bin", "~/.local/bin")),
+            ),
+            repository_branch="main",
+            dotfiles=[],
+            pinned_hash="",
+        )
+    else:
+        manifest_config_path = configdir() / "dfman"
+        manifest_format = questionary.select(
+            "Select the manifest format:",
+            choices=[
+                questionary.Choice(ManifestFormat.TOML, checked=True),
+                questionary.Choice(ManifestFormat.YAML),
+                questionary.Choice(ManifestFormat.JSON),
+            ],
+        ).ask()
+        manifest_path = manifest_config_path.with_suffix(f".{manifest_format}")
+        if manifest_path.exists():
+            print(
+                colored(
+                    f"Manifest file {manifest_path} already exists. Please remove it or use a different path.",
+                    "yellow",
+                )
+            )
+            return
+
+        def _validate_path(path: str | Path) -> Path:
+            """
+            Validate the provided path for the manifest root.
+            Ensures that the path is a directory and is writable.
+            """
+            path = Path(path).expanduser().resolve()
+            if not path.is_relative_to(Path.home()):
+                raise ValidationError(
+                    "The manifest root must be a subdirectory of your home directory."
+                )
+            return path
+
+        manifest = Manifest(
+            root=questionary.path(
+                "Enter the root directory for your dotfiles:",
+                default=(Path.home() / ".dotfiles").as_posix(),
+                validate=_validate_path,
+                only_directories=True,
+            ).ask(),
+            repository_url=questionary.text(
+                "Enter the URL of your dotfiles repository",
+            ).ask(),
+            original_format=manifest_format,
+            extra_paths=(),
+            default_terminal=questionary.text(
+                "Enter your default terminal (leave empty for none):",
+                default="",
+            ).ask(),
+            default_editor=questionary.text(
+                "Enter your default editor (leave empty for none):",
+                default="",
+            ).ask(),
+            default_shell=PartialEntry(
+                "bash",
+                map(Path, ("/usr/bin", "/bin", "/usr/local/bin", "~/.local/bin")),
+            ),
+            repository_branch=questionary.text(
+                "Enter the branch of your repository to use (default: main):",
+                default="main",
+            ).ask(),
+            dotfiles=[],
+            pinned_hash=questionary.text(
+                "Enter the pinned hash for your repository (leave empty for none):",
+                default="",
+            ).ask(),
+        )
+
+    source_path = manifest.root / manifest_path.name
+    if source_path.exists():
+        raise ValidationError(
+            f"Manifest file {source_path} already exists. Please remove it or use a different path."
+        )
+    persist_changes(manifest, source_path)
+    manifest_path.symlink_to(source_path)
+    print(
+        colored(
+            f"Dotfile manager initialized with manifest at {manifest_path}.",
+            "green",
+        )
+    )
+    GitSyncer.init_git(manifest.root)

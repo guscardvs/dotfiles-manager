@@ -41,7 +41,6 @@ def manifest_is_equal(left: Manifest, right: Manifest) -> bool:
         and left.repository_branch == right.repository_branch
         and dotfiles_are_equal(left.dotfiles, right.dotfiles)
         and left.pinned_hash == right.pinned_hash
-        and left.push_after_commit == right.push_after_commit
     )
 
 

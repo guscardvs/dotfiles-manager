@@ -55,4 +55,3 @@ class Manifest:
     repository_branch: str = "main"
     dotfiles: list[Dotfile] =field(default_factory=list)
     pinned_hash: str = ""
-    push_after_commit: bool = True
