@@ -15,6 +15,12 @@ A flexible, Python-based tool for managing, synchronizing, and linking your dotf
 
 ---
 
+## Goals
+
+Check pending features at [goals.md](./goals.md)
+
+---
+
 ## Installation
 
 Clone the repository and install dependencies:
