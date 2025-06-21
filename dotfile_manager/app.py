@@ -397,7 +397,7 @@ def edit_file(
     editor_cmd = [editor, str(file_path)]
     print(colored(f"Opening {file_path} in {editor}...", "green"))
     try:
-        subprocess.run(editor_cmd, check=True)
+        _ = subprocess.run(editor_cmd, check=True)
     except subprocess.CalledProcessError as e:
         raise ValidationError(f"Failed to open editor: {e}")
     except FileNotFoundError:
@@ -492,7 +492,7 @@ def edit_manifest(
     editor_cmd = [editor, str(manifest_path)]
     print(colored(f"Opening {manifest_path} in {editor}...", "green"))
     try:
-        subprocess.run(editor_cmd, check=True)
+        _ = subprocess.run(editor_cmd, check=True)
     except subprocess.CalledProcessError as e:
         raise ValidationError(f"Failed to open editor: {e}")
     except FileNotFoundError:
@@ -651,7 +651,7 @@ def remove(
 
     # Save the updated manifest
     with open(manifest_path, "w") as f:
-        f.write(dumpers[manifest_format](manifest))
+        _ = f.write(dumpers[manifest_format](manifest))
 
     print(colored("Dotfiles removed and manifest updated successfully.", "green"))
     persist_changes(manifest, manifest_path)
@@ -750,10 +750,18 @@ def revert(
         manifest_format (ManifestFormat): The format of the manifest file.
         sync (bool): Whether to sync the manifest after reverting.
     """
-    # TODO: implement a working version of revert that does not depend on user interaction or force-change.
-    # raise NotImplementedError(
-    #     "Revert functionality is not implemented yet. Please use the 'sync' command to update the dotfiles."
-    # )
+    print(
+        colored(
+            "Reverting the manifest is experimental and may have bugs.",
+            "yellow",
+        )
+    )
+    if not questionary.confirm(
+        "Are you sure you want to revert the manifest? (y/n)",
+        default=True,
+    ).ask():
+        print(colored("Revert cancelled.", "red"))
+        return
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
     )
@@ -836,7 +844,7 @@ def exec_(
         if not shutil.which(with_command):
             raise ValidationError(f"Command {with_command} not found in PATH.")
         print(colored(f"Running command: {with_command} {dfloc_path}", "yellow"))
-        subprocess.run([with_command, str(dfloc_path)], check=True)
+        _ = subprocess.run([with_command, str(dfloc_path)], check=True)
     else:
         with open(dfloc_path) as f:
             print(colored(f.read(), "green"))
@@ -966,4 +974,36 @@ def init(ask: bool = True):
             "green",
         )
     )
-    GitSyncer.init_git(manifest.root)
+    _ = GitSyncer.init_git(manifest.root)
+
+@app.command
+@handle_error
+def save_changes(
+    manifest_path: Path = CONFIG_DIR,
+    manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
+    save: bool = True,
+):
+    """
+    Save changes to the manifest and optionally pull changes from the remote repository.
+
+    Args:
+        manifest_path (Path): The path to the manifest file.
+        manifest_format (ManifestFormat): The format of the manifest file.
+        message (str | None): The commit message to use when saving changes.
+        save (bool): Whether to save changes to the remote.
+    """
+    manifest_path, manifest_format = validate_manifest_path(
+        manifest_path, manifest_format
+    )
+    manifest = loaders[manifest_format](manifest_path)
+    syncer = GitSyncer.from_manifest(manifest)
+    if not syncer.is_dirty():
+        print(colored("No changes to save.", "yellow"))
+        return
+    syncer.apply(message)
+    if save:
+        syncer.save()
+        print(colored("Changes saved successfully.", "green"))
+    else:
+        print(colored("Changes saved, run `dfman sync` to sync with remote.", "yellow"))

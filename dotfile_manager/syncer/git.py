@@ -83,7 +83,7 @@ class GitSyncer:
         commit_message = message or self.commit_message.format(
             timestamp=get_timezone().now().isoformat(timespec="seconds")
         )
-        repo.index.commit(commit_message)
+        _ = repo.index.commit(commit_message)
 
     def save(self) -> None:
         """
@@ -92,7 +92,7 @@ class GitSyncer:
         """
         repo = self.instance
         origin = repo.remote(name="origin")
-        origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        _ = origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
         if self.pinned_hash:
             raise ValidationError("Cannot sync changes with a pinned hash.")
         print(
@@ -107,7 +107,7 @@ class GitSyncer:
         """
         repo = self.instance
         origin = repo.remote(name="origin")
-        origin.pull(refspec=f"{self.repository_branch}", rebase=True)
+        _ = origin.pull(refspec=f"{self.repository_branch}", rebase=True)
         print(
             colored(f"Repository {self.repository_path} pulled successfully.", "green")
         )
@@ -190,11 +190,11 @@ class GitSyncer:
                 else:
                     raise ValidationError(
                         f"Manifest format mismatch: expected {manifest_format}, "
-                        f"but found {file_format} in {manifest_path}"
+                        + f"but found {file_format} in {manifest_path}"
                     )
             manifest = loaders[manifest_format](manifest_path)
             if manifest.root != repository_path:
-                shutil.move(
+                _ = shutil.move(
                     repository_path,
                     manifest.root,
                 )
@@ -230,18 +230,21 @@ class GitSyncer:
             raise ValidationError(
                 "Cannot revert changes while the repository has uncommitted changes."
             )
-        
+
         if repo.head.object.hexsha == refspec:
             print(colored("Already at the specified commit or branch.", "yellow"))
             return
-        
-        commit_info = next_or((commit, distance) for distance, commit in enumerate(repo.iter_commits()) if commit.hexsha == refspec)
+
+        commit_info = next_or(
+            (commit, distance)
+            for distance, commit in enumerate(repo.iter_commits())
+            if commit.hexsha == refspec
+        )
         if not commit_info:
             raise ValidationError(
                 f"Commit or branch '{refspec}' not found in the repository."
             )
-        commit, distance = commit_info
-        
+
         if not backup_branch:
             backup_branch = f"backup-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -256,7 +259,7 @@ class GitSyncer:
         repo.git.checkout(self.repository_branch)
         self._insist_revert(refspec)
 
-        if  repo.is_dirty(untracked_files=True):
+        if repo.is_dirty(untracked_files=True):
             print(colored("Repository has uncommitted changes after revert.", "yellow"))
             repo.git.add(A=True)
             repo.git.commit(m=f"Reverted to {refspec}")
@@ -268,7 +271,6 @@ class GitSyncer:
             )
         )
 
-
     def _insist_revert(self, refspec: str) -> None:
         """
         Insists on reverting to a specific commit or branch.
@@ -277,7 +279,9 @@ class GitSyncer:
         repo = self.instance
         while True:
             try:
-                repo.git.revert(refspec, no_edit=True, no_commit=True, strategy="theirs")
+                repo.git.revert(
+                    refspec, no_edit=True, no_commit=True, strategy="theirs"
+                )
                 break
             except GitCommandError as e:
                 if "nothing to revert" in str(e):
@@ -285,11 +289,20 @@ class GitSyncer:
                     return
                 elif "conflict" in str(e):
                     print(colored("Merge conflict detected. Insisting.", "red"))
-                    unmerged = [item for item in repo.index.diff("HEAD") if item.change_type == "U"]
+                    unmerged = [
+                        item
+                        for item in repo.index.diff("HEAD")
+                        if item.change_type == "U"
+                    ]
                     for item in unmerged:
                         print(colored(f"Unmerged file: {item.a_path}", "red"))
-                        print(colored("Attempting to resolve conflicts automatically.", "yellow"))
-                        repo.git.checkout(item.b_path, theirs=True )
+                        print(
+                            colored(
+                                "Attempting to resolve conflicts automatically.",
+                                "yellow",
+                            )
+                        )
+                        repo.git.checkout(item.b_path, theirs=True)
                         repo.git.add(A=True)
                     print(colored("Conflicts resolved. Committing changes.", "green"))
                     _ = repo.index.commit(f"Resolved conflicts for revert to {refspec}")
@@ -318,3 +331,12 @@ class GitSyncer:
         print(colored("Commit Log:", "blue"))
         for entry in log_entries:
             print(colored(entry, "green"))
+
+    def is_dirty(self) -> bool:
+        """
+        Checks if the repository has uncommitted changes.
+
+        Returns:
+            bool: True if the repository is dirty, False otherwise.
+        """
+        return self.instance.is_dirty(untracked_files=True)
