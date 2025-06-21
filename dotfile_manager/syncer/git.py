@@ -7,8 +7,8 @@ from typing import Self
 
 from escudeiro.data import data
 from escudeiro.lazyfields import lazyfield
-from escudeiro.misc import to_snake
-from git import Repo
+from escudeiro.misc import next_or, to_snake
+from git import GitCommandError, Repo
 from termcolor import colored
 
 from dotfile_manager.manifest.concepts import ManifestFormat
@@ -225,52 +225,80 @@ class GitSyncer:
                 If not provided, a default backup branch name will be used.
 
         """
-
-        if self.pinned_hash:
-            raise ValidationError("Cannot revert changes with a pinned hash.")
-
-        backup_branch = (
-            backup_branch
-            or f"backup_{to_snake(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))}"
-        )
         repo = self.instance
-        if backup_branch not in repo.branches:
-            repo.git.checkout("-b", backup_branch)
-        else:
-            repo.git.checkout(backup_branch)
-        origin = repo.remote(name="origin")
-        origin.push(
-            refspec=f"{backup_branch}:{backup_branch}",
-            force=True,
-        )
-        repo.git.checkout(self.repository_branch)
-        commits_to_revert = list(repo.iter_commits(f"{refspec}..HEAD"))
-        if not commits_to_revert:
-            print(colored("No commits to revert.", "yellow"))
+        if repo.is_dirty(untracked_files=True):
+            raise ValidationError(
+                "Cannot revert changes while the repository has uncommitted changes."
+            )
+        
+        if repo.head.object.hexsha == refspec:
+            print(colored("Already at the specified commit or branch.", "yellow"))
             return
-        repo.git.revert(
-            *[commit.hexsha for commit in commits_to_revert],
-            no_edit=True,
-        )
+        
+        commit_info = next_or((commit, distance) for distance, commit in enumerate(repo.iter_commits()) if commit.hexsha == refspec)
+        if not commit_info:
+            raise ValidationError(
+                f"Commit or branch '{refspec}' not found in the repository."
+            )
+        commit, distance = commit_info
+        
+        if not backup_branch:
+            backup_branch = f"backup-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-        # save and push changes
-        origin = repo.remote(name="origin")
-        origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        if backup_branch in repo.branches:
+            raise ValidationError(
+                f"Backup branch '{backup_branch}' already exists. Please choose a different name."
+            )
+        repo.git.checkout("-b", backup_branch)
+        remote = repo.remote(name="origin")
+        if remote.exists():
+            _ = remote.push(refspec=f"{backup_branch}:{backup_branch}")
+        repo.git.checkout(self.repository_branch)
+        self._insist_revert(refspec)
+
+        if  repo.is_dirty(untracked_files=True):
+            print(colored("Repository has uncommitted changes after revert.", "yellow"))
+            repo.git.add(A=True)
+            repo.git.commit(m=f"Reverted to {refspec}")
+        _ = remote.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
         print(
             colored(
-                f"Repository {self.repository_path} reverted to {refspec} (via revert commits) and changes pushed successfully.",
+                f"Repository reverted to {refspec} and backup created at {backup_branch}.",
                 "green",
             )
         )
-        if backup_branch != self.repository_branch:
-            print(
-                colored(
-                    f"Backup branch {backup_branch} created with the state before the revert.",
-                    "yellow",
-                )
-            )
 
-    def log(self, limit: int = 10) -> None:
+
+    def _insist_revert(self, refspec: str) -> None:
+        """
+        Insists on reverting to a specific commit or branch.
+        This method checks if the repository is clean and then performs the revert.
+        """
+        repo = self.instance
+        while True:
+            try:
+                repo.git.revert(refspec, no_edit=True, no_commit=True, strategy="theirs")
+                break
+            except GitCommandError as e:
+                if "nothing to revert" in str(e):
+                    print(colored("No changes to revert.", "yellow"))
+                    return
+                elif "conflict" in str(e):
+                    print(colored("Merge conflict detected. Insisting.", "red"))
+                    unmerged = [item for item in repo.index.diff("HEAD") if item.change_type == "U"]
+                    for item in unmerged:
+                        print(colored(f"Unmerged file: {item.a_path}", "red"))
+                        print(colored("Attempting to resolve conflicts automatically.", "yellow"))
+                        repo.git.checkout(item.b_path, theirs=True )
+                        repo.git.add(A=True)
+                    print(colored("Conflicts resolved. Committing changes.", "green"))
+                    _ = repo.index.commit(f"Resolved conflicts for revert to {refspec}")
+                    return
+                else:
+                    print(colored(f"Error during revert: {e}", "red"))
+                    raise e
+
+    def log(self, limit: int = 10, pretty: bool = True) -> None:
         """
         Prints the commit log of the repository.
 
@@ -278,9 +306,12 @@ class GitSyncer:
             limit (int): The number of commits to show in the log. Defaults to 10.
         """
         repo = self.instance
-        log_entries = repo.git.log(
-            "--pretty=format:%h - %an, %ar : %s", n=limit
-        ).splitlines()
+        if pretty:
+            log_entries = repo.git.log(
+                "--pretty=format:%h - %an, %ar : %s", n=limit
+            ).splitlines()
+        else:
+            log_entries = repo.git.log(n=limit).splitlines()
         if not log_entries:
             print(colored("No commits found in the repository.", "yellow"))
             return

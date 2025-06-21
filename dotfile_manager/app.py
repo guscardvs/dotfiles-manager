@@ -36,11 +36,13 @@ app = App(
     name="Dotfile Manager",
 )
 
+CONFIG_DIR = configdir() / "dfman"
+
 
 @app.command
 @handle_error
 def check(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
 ):
     """
@@ -61,7 +63,7 @@ def check(
 @app.command
 @handle_error
 def sync(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     message: Annotated[str | None, Parameter(alias="m")] = None,
     pull: bool = True,
@@ -100,7 +102,7 @@ def sync(
 @app.command
 @handle_error
 def review(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
 ):
     """
@@ -123,7 +125,7 @@ def review(
 @handle_error
 def link(
     dotfiles: Sequence[str | Path] = (),
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
 ):
     """
@@ -188,7 +190,7 @@ def link(
 @app.command
 @handle_error
 def from_system(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     dotfiles: Sequence[str | Path] = USUAL_DOTFILES,
     sync: bool = True,
@@ -272,7 +274,7 @@ def from_system(
 def download(
     repository_url: str,
     branch: str = "main",
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     repository_path: Path = Path.home() / ".dotfiles",
     pinned_hash: str | None = None,
@@ -322,7 +324,7 @@ def edit_file(
     target_path: str | Path | None = None,
     editor: str | None = None,
     description: str | None = None,
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
     message: Annotated[str | None, Parameter(alias="m")] = None,
@@ -455,7 +457,7 @@ def edit_file(
 @handle_error
 def edit_manifest(
     editor: str | None = None,
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
     message: Annotated[str | None, Parameter(alias="m")] = None,
@@ -518,7 +520,7 @@ def edit_manifest(
 @handle_error
 def unlink(
     dotfiles: Sequence[str | Path] = (),
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
 ):
     """
@@ -577,7 +579,7 @@ def unlink(
 @handle_error
 def remove(
     dotfiles: Sequence[str | Path],
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
     message: Annotated[str | None, Parameter(alias="m")] = None,
@@ -669,7 +671,7 @@ def remove(
 @app.command
 @handle_error
 def list_dotfiles(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
 ):
     """
@@ -689,7 +691,7 @@ def list_dotfiles(
 @app.command
 @handle_error
 def map_orphaned_files(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
     message: Annotated[str | None, Parameter(alias="m")] = None,
@@ -734,7 +736,7 @@ def map_orphaned_files(
 def revert(
     refspec: str,
     backup_branch: str | None = None,
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     sync: bool = True,
 ):
@@ -749,9 +751,9 @@ def revert(
         sync (bool): Whether to sync the manifest after reverting.
     """
     # TODO: implement a working version of revert that does not depend on user interaction or force-change.
-    raise NotImplementedError(
-        "Revert functionality is not implemented yet. Please use the 'sync' command to update the dotfiles."
-    )
+    # raise NotImplementedError(
+    #     "Revert functionality is not implemented yet. Please use the 'sync' command to update the dotfiles."
+    # )
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
     )
@@ -766,9 +768,10 @@ def revert(
 @app.command
 @handle_error
 def log(
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     limit: int = 10,
+    pretty: bool = True
 ):
     """
     Show the git log of the manifest repository.
@@ -782,14 +785,14 @@ def log(
         manifest_path, manifest_format
     )
     syncer = GitSyncer.from_manifest(loaders[manifest_format](manifest_path))
-    syncer.log(limit)
+    syncer.log(limit, pretty)
 
 
 @app.command
 @handle_error
 def exec_(
     dotfile: str | Path,
-    manifest_path: Path = configdir() / "dfman",
+    manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     with_command: str | None = None,
 ):
@@ -857,7 +860,7 @@ def init(ask: bool = True):
             )
         )
         manifest_format = ManifestFormat.TOML
-        manifest_path = configdir() / "dfman"
+        manifest_path = CONFIG_DIR
         if manifest_path.exists():
             print(
                 colored(
@@ -884,7 +887,7 @@ def init(ask: bool = True):
             pinned_hash="",
         )
     else:
-        manifest_config_path = configdir() / "dfman"
+        manifest_config_path = CONFIG_DIR
         manifest_format = questionary.select(
             "Select the manifest format:",
             choices=[

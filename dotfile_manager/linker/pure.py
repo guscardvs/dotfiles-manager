@@ -326,7 +326,7 @@ class PureLinker:
                 )
                 continue
             elif likely_location.exists():
-                print(colored("Dotfile already linked.", "green"))
+                print(colored(f"Dotfile {dotfile.name} already linked.", "green"))
             else:
                 self.link(dotfile)
 
