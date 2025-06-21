@@ -15,8 +15,8 @@ Checkpoints:
 - [X] Add support for symlinks to manage dotfiles in different locations.
 - [ ] Create a test suite to ensure the tool works as expected.
 - [ ] Write documentation to help users understand how to use the tool.
-- [ ] Create a simple web interface to visualize and manage dotfiles.
 - [ ] Implement a notification system to alert users of changes to dotfiles.
 - [X] Add support for cloud storage to sync dotfiles across devices.
 - [X] Implement a command to automatically update dotfiles from a remote repository.
+- [ ] Create a simple web interface to visualize and manage dotfiles.
 - [ ] Create a plugin system to allow users to extend the tool's functionality.

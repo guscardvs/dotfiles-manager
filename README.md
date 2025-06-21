@@ -210,6 +210,19 @@ dfman exec ~/.bashrc
 
 ---
 
+### `save-changes`
+
+Save changes to the manifest and optionally push them to the remote repository.
+
+```bash
+dfman save-changes --m "Commit message" --save
+```
+
+- `--m`: Commit message for the changes.
+- `--save`: Push changes to the remote (default: True). If not set, only commits locally.
+
+---
+
 ## Manifest Example
 
 ```toml
