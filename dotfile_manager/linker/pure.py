@@ -67,13 +67,13 @@ class PureLinker:
         if not floc.exists():
             raise ValidationError(
                 f"Dotfile location {floc} does not exist. "
-                "Please ensure the dotfile is present in the manifest root."
+                + "Please ensure the dotfile is present in the manifest root."
             )
         out_location = home / dotfile.location
         if out_location.exists():
             raise ValidationError(
                 f"Output location {out_location} already exists. "
-                "Please remove it before linking."
+                + "Please remove it before linking."
             )
         out_location.parent.mkdir(parents=True, exist_ok=True)
         out_location.symlink_to(floc, target_is_directory=floc.is_dir())
@@ -96,20 +96,20 @@ class PureLinker:
                 print(
                     colored(
                         f"Output location {out_location} already exists and "
-                        "is a symlink to the correct location. Skipping.",
+                        + "is a symlink to the correct location. Skipping.",
                         "yellow",
                     )
                 )
                 return out_location.as_posix()
             raise ValidationError(
                 f"Output location {out_location} already exists. "
-                "Please remove it before linking."
+                + "Please remove it before linking."
             )
         elif out_location.is_symlink():
             print(
                 colored(
                     f"Output location {out_location} is a ghost symlink. "
-                    "Removing it before creating a new link.",
+                    + "Removing it before creating a new link.",
                     "yellow",
                 )
             )
@@ -124,7 +124,7 @@ class PureLinker:
         if not floc.exists():
             raise ValidationError(
                 f"Dotfile location {floc} does not exist. "
-                "Please ensure the dotfile is present in the manifest root."
+                + "Please ensure the dotfile is present in the manifest root."
             )
         out_location.symlink_to(floc, target_is_directory=floc.is_dir())
         return out_location.as_posix()
@@ -155,7 +155,11 @@ class PureLinker:
                 )
                 continue
             dfloc = self.manifest.root / file.relative_to(Path.home())
-            if dfloc.exists() and file.is_symlink() and dfloc.resolve() == file.resolve():
+            if (
+                dfloc.exists()
+                and file.is_symlink()
+                and dfloc.resolve() == file.resolve()
+            ):
                 print(
                     colored(
                         f"Dotfile {file} is already a symlink. Skipping.",
@@ -195,7 +199,7 @@ class PureLinker:
                 print(
                     colored(
                         f"Dotfile {dotfile.name} exists at {dfloc} but is not a file. "
-                        "Please remove it before adding.",
+                        + "Please remove it before adding.",
                         "red",
                     )
                 )
@@ -203,10 +207,10 @@ class PureLinker:
             if not dfloc.exists():
                 dfloc.parent.mkdir(parents=True, exist_ok=True)
             if file.is_file():
-                shutil.move(file, dfloc)
+                _ = shutil.move(file, dfloc)
             else:
                 # If it's a directory, copy it instead of moving
-                shutil.copytree(file, dfloc, dirs_exist_ok=True)
+                _ = shutil.copytree(file, dfloc, dirs_exist_ok=True)
                 shutil.rmtree(file, ignore_errors=True)
             self.manifest.dotfiles.append(dotfile)
 
@@ -224,12 +228,12 @@ class PureLinker:
         if not out_location.exists():
             raise ValidationError(
                 f"Output location {out_location} does not exist. "
-                "Please ensure the dotfile is linked before unlinking."
+                + "Please ensure the dotfile is linked before unlinking."
             )
         if not out_location.is_symlink():
             raise ValidationError(
                 f"Output location {out_location} is not a symlink. "
-                "Please ensure the dotfile is linked before unlinking."
+                + "Please ensure the dotfile is linked before unlinking."
             )
         print(colored(f"Unlinking {dotfile.name} from {out_location}", "yellow"))
         if out_location.is_dir():
@@ -259,7 +263,7 @@ class PureLinker:
         Returns:
             list[Path]: A list of unmanaged files and directories in the manifest root.
         """
-        orphaned_files = []
+        orphaned_files: list[Path] = []
         for item in self.manifest.root.iterdir():
             if item.is_dir() and item.name == ".git":
                 # Skip the .git directory
@@ -271,12 +275,8 @@ class PureLinker:
             ):
                 # Skip the manifest file itself
                 continue
-            if item.is_file() or item.is_dir():
-                if not any(
-                    dotfile.location == item.relative_to(Path.home()).as_posix()
-                    for dotfile in self.manifest.dotfiles
-                ):
-                    orphaned_files.append(item)
+            if self._is_orphaned(item):
+                orphaned_files.append(item)
         if orphaned_files:
             print(
                 colored(
@@ -294,6 +294,28 @@ class PureLinker:
                 )
             )
         return orphaned_files
+
+    def _is_orphaned(self, path: Path) -> bool:
+        """
+        Check if a file is orphaned (not managed by the manifest).
+
+        Args:
+            file (Path): The file to check.
+
+        Returns:
+            bool: True if the file is orphaned, False otherwise.
+        """
+        if not path.is_file() and not path.is_dir():
+            return False
+        relative_path = path.relative_to(self.manifest.root)
+        for dotfile in self.manifest.dotfiles:
+            # Check if the dotfile's location matches the path's relative path
+            if dotfile.location == relative_path.as_posix():
+                return False
+            # Check if the managed part is a subdirectory of the path
+            elif Path(dotfile.dflocation).is_relative_to(relative_path):
+                return False
+        return True
 
     def sync_orphaned(self, orphaned_files: list[Path]) -> None:
         """
@@ -315,9 +337,8 @@ class PureLinker:
                 description=f"Unmanaged dotfile for {file.name}",
             )
             if (
-                (not likely_location.is_symlink() and likely_location.exists())
-                or likely_location.resolve() != file.resolve()
-            ):
+                not likely_location.is_symlink() and likely_location.exists()
+            ) or likely_location.resolve() != file.resolve():
                 print(
                     colored(
                         f"Dotfile is broken: {dotfile.dflocation} -> ({likely_location.as_posix()}), not fixing it.",
@@ -329,6 +350,7 @@ class PureLinker:
                 print(colored(f"Dotfile {dotfile.name} already linked.", "green"))
             else:
                 self.link(dotfile)
+            self.manifest.dotfiles.append(dotfile)
 
         print(colored("Unmanaged files and directories synced.", "green"))
 
@@ -379,16 +401,16 @@ class PureLinker:
         Returns:
             list[tuple[Path, Path]]: A list of tuples containing the original file and its backup.
         """
-        backups = []
+        backups: list[tuple[Path, Path]] = []
         for file in files:
             if not file.exists():
                 print(colored(f"File {file} does not exist. Skipping backup.", "red"))
                 continue
             backup_file = file.with_suffix(file.suffix + ".bak")
             if file.is_file():
-                shutil.copy(file, backup_file)
+                _ = shutil.copy(file, backup_file)
             else:
-                shutil.copytree(file, backup_file, dirs_exist_ok=True)
+                _ = shutil.copytree(file, backup_file, dirs_exist_ok=True)
             backups.append((file, backup_file))
             print(colored(f"Backed up {file} to {backup_file}", "green"))
         return backups
@@ -413,7 +435,7 @@ class PureLinker:
                     )
                 )
             if backup.is_file():
-                shutil.move(backup, original)
+                _ = shutil.move(backup, original)
             else:
                 if original.exists() and original.is_dir():
                     print(
@@ -423,9 +445,7 @@ class PureLinker:
                         )
                     )
                     shutil.rmtree(original, ignore_errors=True)
-                shutil.copytree(
-                    backup, original, dirs_exist_ok=True
-                )
+                _ = shutil.copytree(backup, original, dirs_exist_ok=True)
                 shutil.rmtree(backup, ignore_errors=True)
             print(colored(f"Restored {original} from {backup}", "green"))
 
@@ -438,7 +458,11 @@ class PureLinker:
         """
         for original, backup in backups:
             if not backup.exists():
-                print(colored(f"Backup {backup} does not exist. Skipping deletion.", "red"))
+                print(
+                    colored(
+                        f"Backup {backup} does not exist. Skipping deletion.", "red"
+                    )
+                )
                 continue
             if backup.is_file():
                 backup.unlink()
@@ -460,7 +484,7 @@ class PureLinker:
                 print(
                     colored(
                         f"Dotfile {dotfile.name} does not exist in the manifest root. "
-                        "Skipping link persistence.",
+                        + "Skipping link persistence.",
                         "red",
                     )
                 )
@@ -469,7 +493,7 @@ class PureLinker:
                 print(
                     colored(
                         f"Output location {out_location} exists and is not a symlink. "
-                        "Removing it before linking.",
+                        + "Removing it before linking.",
                         "yellow",
                     )
                 )
@@ -484,7 +508,7 @@ class PureLinker:
                 print(
                     colored(
                         f"Output location {out_location} is a ghost symlink. "
-                        "Removing it before linking.",
+                        + "Removing it before linking.",
                         "yellow",
                     )
                 )
