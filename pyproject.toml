@@ -1,5 +1,5 @@
 [project]
-name = "dotfile-manager"
+name = "dfman"
 version = "0.1.0"
 description = "A tool to manage and synchronize dotfiles across multiple systems."
 readme = "README.md"
@@ -15,6 +15,10 @@ dependencies = [
 ]
 
 
+[tool.setuptools]
+packages = ["dotfile_manager"]
+
+
 [project.scripts]
 dotfile-manager = "dotfile_manager.app:app"
 dfman = "dotfile_manager.app:app"
@@ -22,6 +26,7 @@ dfman = "dotfile_manager.app:app"
 [dependency-groups]
 dev = [
     "basedpyright>=1.29.4",
+    "build>=1.2.2.post1",
     "ruff>=0.11.13",
 ]
 
