@@ -8,6 +8,7 @@ class ManifestFormat(ValueEnum, KebabEnum):
     """
     Enum representing the format of the manifest.
     """
+
     JSON = auto()
     YAML = auto()
     TOML = auto()
@@ -16,5 +17,5 @@ class ManifestFormat(ValueEnum, KebabEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: object) -> 'ManifestFormat':
+    def _missing_(cls, value: object) -> "ManifestFormat":
         return super()._missing_(value) or cls.PRESUMED

@@ -79,7 +79,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cyclopts", specifier = ">=3.19.0" },
-    { name = "escudeiro", specifier = ">=0.2.3" },
+    { name = "escudeiro", specifier = ">=0.2.9" },
     { name = "gitpython", specifier = ">=3.1.44" },
     { name = "questionary", specifier = ">=2.1.0" },
     { name = "ruamel-yaml", specifier = ">=0.18.14" },
@@ -95,17 +95,18 @@ dev = [
 
 [[package]]
 name = "escudeiro"
-version = "0.2.8"
+version = "0.2.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "orjson" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/bb/f43863847e3b2895fcb00977dd298a64ffa332f064333aab26705f0b0ada/escudeiro-0.2.8.tar.gz", hash = "sha256:be71279ce64bec4f641761279e02600f96f2b56619fb82a41d403d1f5c29ca0e", size = 198940, upload-time = "2025-06-15T04:30:24.372Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/08/3a2904ec67d3f7a7b5dd69e0b0877a3fb60aea291ed9bd729cd2be484a43/escudeiro-0.2.9.tar.gz", hash = "sha256:b934fb033ca9737f32bf0d7ae0cc30cdab338f0efd45d72e24b8b67a69e83adc", size = 201255, upload-time = "2025-07-06T06:52:34.762Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/5d/0a54be197676cb1f4f304507329235e97790a28eabb73ed5eb1a65edfe76/escudeiro-0.2.8-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:d1c21cd309a9a17dd0dfd9520257569d4342b257e9ff2ddb82315a4754dd9d9e", size = 1260414, upload-time = "2025-06-15T04:33:12.708Z" },
-    { url = "https://files.pythonhosted.org/packages/4d/c2/034de279dd573db0e2edd5b67337c6311e44051112b73a62664a9d3d41ce/escudeiro-0.2.8-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:4355b5c91a83b0de89edb6119bbda0b5a4a64ee06a58fafb2845abbb348fd79e", size = 1439189, upload-time = "2025-06-15T04:30:21.955Z" },
-    { url = "https://files.pythonhosted.org/packages/2b/c1/d96afd474b0f9390b142105588e78573dd43798ee23149665350f920fb85/escudeiro-0.2.8-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:c8b22ed3bb4cfa38d6d58c6b45e0d349a0da8f0eb1ed73c8b366a9124b0edd2d", size = 1240256, upload-time = "2025-06-15T04:30:59.287Z" },
+    { url = "https://files.pythonhosted.org/packages/25/67/e9bdd8a20f9510a489290c2ab1f0108812197f7242906bfc510ac14d3cb0/escudeiro-0.2.9-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ad10171298923821181d1d3f620d9749deddb1a22c407235d23f32835b8e7233", size = 1244610, upload-time = "2025-07-06T06:52:26.688Z" },
+    { url = "https://files.pythonhosted.org/packages/46/94/2fc440004a9d32f08336dd586004855d2ed401459e6c207b0d2677720aa6/escudeiro-0.2.9-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:43a10dcbddc8dc5059dee732e9b98ed8a7ef5b7ca6b87812f2c1e6099e71aabb", size = 1244677, upload-time = "2025-07-06T06:52:29.457Z" },
+    { url = "https://files.pythonhosted.org/packages/71/47/48fb551a935a9f37b46708b5fbb8723a9719ef75b7792cb01ab1ab96391b/escudeiro-0.2.9-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:7dfa7aac1830b1c1ed3c40afd73420fb4b84c608a1110d79de7b148623dbb4d2", size = 1397325, upload-time = "2025-07-06T06:52:32.33Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/46/f091581a5b86dd608514f5526279a47d20045b534391941eca068de88e71/escudeiro-0.2.9-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:3ef8eb7cef7c278624ef27e20af6a91335fc0f319f8240bf219b14119bd9df03", size = 1241329, upload-time = "2025-07-06T06:52:50.058Z" },
 ]
 
 [[package]]

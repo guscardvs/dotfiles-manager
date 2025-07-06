@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "cyclopts>=3.19.0",
-    "escudeiro>=0.2.3",
+    "escudeiro>=0.2.9",
     "gitpython>=3.1.44",
     "questionary>=2.1.0",
     "ruamel-yaml>=0.18.14",
