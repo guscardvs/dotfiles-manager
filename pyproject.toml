@@ -1,6 +1,6 @@
 [project]
 name = "dfman"
-version = "0.1.0"
+version = "0.1.1"
 description = "A tool to manage and synchronize dotfiles across multiple systems."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -15,8 +15,8 @@ dependencies = [
 ]
 
 
-[tool.setuptools]
-packages = ["dotfile_manager"]
+[tool.setuptools.packages.find]
+include = ["dotfile_manager*"]
 
 
 [project.scripts]
