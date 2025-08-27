@@ -101,6 +101,24 @@ def sync(
 
 @app.command
 @handle_error
+def save(
+    manifest_path: Path = CONFIG_DIR,
+    manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
+    message: Annotated[str | None, Parameter(alias="m")] = None,
+):
+    """
+    Save changes to the manifest file.
+
+    Args:
+        manifest_path (Path): The path to the manifest file.
+        manifest_format (ManifestFormat): The format of the manifest file.
+        message (str | None): The commit message to use when saving changes.
+    """
+    sync(manifest_path, manifest_format, message, pull=False, save=True)
+
+
+@app.command
+@handle_error
 def review(
     manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
@@ -779,7 +797,7 @@ def log(
     manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
     limit: int = 10,
-    pretty: bool = True
+    pretty: bool = True,
 ):
     """
     Show the git log of the manifest repository.
@@ -975,35 +993,3 @@ def init(ask: bool = True):
         )
     )
     _ = GitSyncer.init_git(manifest.root)
-
-@app.command
-@handle_error
-def save_changes(
-    manifest_path: Path = CONFIG_DIR,
-    manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
-    message: Annotated[str | None, Parameter(alias="m")] = None,
-    save: bool = True,
-):
-    """
-    Save changes to the manifest and optionally pull changes from the remote repository.
-
-    Args:
-        manifest_path (Path): The path to the manifest file.
-        manifest_format (ManifestFormat): The format of the manifest file.
-        message (str | None): The commit message to use when saving changes.
-        save (bool): Whether to save changes to the remote.
-    """
-    manifest_path, manifest_format = validate_manifest_path(
-        manifest_path, manifest_format
-    )
-    manifest = loaders[manifest_format](manifest_path)
-    syncer = GitSyncer.from_manifest(manifest)
-    if not syncer.is_dirty():
-        print(colored("No changes to save.", "yellow"))
-        return
-    syncer.apply(message)
-    if save:
-        syncer.save()
-        print(colored("Changes saved successfully.", "green"))
-    else:
-        print(colored("Changes saved, run `dfman sync` to sync with remote.", "yellow"))
