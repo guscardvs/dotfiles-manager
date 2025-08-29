@@ -7,8 +7,8 @@ from typing import Self
 
 from escudeiro.data import data
 from escudeiro.lazyfields import lazyfield
-from escudeiro.misc import next_or, to_snake
-from git import GitCommandError, Repo
+from escudeiro.misc import next_or
+from git import BadName, GitCommandError, Repo
 from termcolor import colored
 
 from dotfile_manager.manifest.concepts import ManifestFormat
@@ -55,13 +55,28 @@ class GitSyncer:
         """
         if not (self.repository_path / ".git").exists():
             self.repository_path.mkdir(parents=True, exist_ok=True)
-            repo = Repo.init(self.repository_path)
+            repo = Repo.init(
+                self.repository_path, initial_branch=self.repository_branch
+            )
         else:
             repo = Repo(self.repository_path)
             if repo.bare:
-                repo = Repo.init(self.repository_path)
+                repo = Repo.init(
+                    self.repository_path, initial_branch=self.repository_branch
+                )
         if not repo.remotes:
             repo.create_remote("origin", self.repository_url)
+        if self.pinned_hash:
+            try:
+                commit = repo.commit(self.pinned_hash)
+            except BadName:
+                raise ValidationError(
+                    f"Invalid pinned_hash {self.pinned_hash} received."
+                )
+            else:
+                if commit != repo.head.commit:
+                    _ = repo.create_head("pinned_hash", self.pinned_hash)
+                    repo.heads.pinned_hash.checkout()
         return repo
 
     @classmethod
@@ -92,12 +107,15 @@ class GitSyncer:
         """
         repo = self.instance
         origin = repo.remote(name="origin")
-        _ = origin.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        _ = origin.push(
+            refspec=f"{self.repository_branch}:{self.repository_branch}"
+        )
         if self.pinned_hash:
             raise ValidationError("Cannot sync changes with a pinned hash.")
         print(
             colored(
-                f"Repository {self.repository_path} synchronized successfully.", "green"
+                f"Repository {self.repository_path} synchronized successfully.",
+                "green",
             )
         )
 
@@ -109,7 +127,10 @@ class GitSyncer:
         origin = repo.remote(name="origin")
         _ = origin.pull(refspec=f"{self.repository_branch}", rebase=True)
         print(
-            colored(f"Repository {self.repository_path} pulled successfully.", "green")
+            colored(
+                f"Repository {self.repository_path} pulled successfully.",
+                "green",
+            )
         )
 
     def sync(self) -> None:
@@ -127,12 +148,20 @@ class GitSyncer:
         """
         repo = self.instance
         status = repo.git.status()
-        print(colored(f"Repository {self.repository_path} status:\n{status}", "blue"))
+        print(
+            colored(
+                f"Repository {self.repository_path} status:\n{status}", "blue"
+            )
+        )
 
         if not repo.is_dirty(untracked_files=True):
             print(colored("No changes to commit.", "green"))
         else:
             print(colored("There are changes to commit.", "yellow"))
+
+    def has_pending_changes(self) -> bool:
+        repo = self.instance
+        return repo.is_dirty(untracked_files=True)
 
     @classmethod
     @contextmanager
@@ -169,7 +198,9 @@ class GitSyncer:
             if pinned_hash:
                 repo.git.checkout(pinned_hash)
             if not (repository_path / ".git").exists():
-                raise ValidationError(f"Failed to clone repository: {repository_url}")
+                raise ValidationError(
+                    f"Failed to clone repository: {repository_url}"
+                )
             manifest_file = None
             for file in repository_path.iterdir():
                 if file.is_file() and file.name.split(".")[0] == "dfman":
@@ -179,7 +210,11 @@ class GitSyncer:
                 raise ValidationError(
                     f"No manifest file found in the specified repository: {repository_url}"
                     + f" with branch {repository_branch}"
-                    + (f" and pinned hash {pinned_hash}" if pinned_hash else "")
+                    + (
+                        f" and pinned hash {pinned_hash}"
+                        if pinned_hash
+                        else ""
+                    )
                 )
             manifest_path, file_format = validate_manifest_path(
                 manifest_file, manifest_format
@@ -232,7 +267,9 @@ class GitSyncer:
             )
 
         if repo.head.object.hexsha == refspec:
-            print(colored("Already at the specified commit or branch.", "yellow"))
+            print(
+                colored("Already at the specified commit or branch.", "yellow")
+            )
             return
 
         commit_info = next_or(
@@ -260,10 +297,17 @@ class GitSyncer:
         self._insist_revert(refspec)
 
         if repo.is_dirty(untracked_files=True):
-            print(colored("Repository has uncommitted changes after revert.", "yellow"))
+            print(
+                colored(
+                    "Repository has uncommitted changes after revert.",
+                    "yellow",
+                )
+            )
             repo.git.add(A=True)
             repo.git.commit(m=f"Reverted to {refspec}")
-        _ = remote.push(refspec=f"{self.repository_branch}:{self.repository_branch}")
+        _ = remote.push(
+            refspec=f"{self.repository_branch}:{self.repository_branch}"
+        )
         print(
             colored(
                 f"Repository reverted to {refspec} and backup created at {backup_branch}.",
@@ -288,7 +332,9 @@ class GitSyncer:
                     print(colored("No changes to revert.", "yellow"))
                     return
                 elif "conflict" in str(e):
-                    print(colored("Merge conflict detected. Insisting.", "red"))
+                    print(
+                        colored("Merge conflict detected. Insisting.", "red")
+                    )
                     unmerged = [
                         item
                         for item in repo.index.diff("HEAD")
@@ -304,8 +350,14 @@ class GitSyncer:
                         )
                         repo.git.checkout(item.b_path, theirs=True)
                         repo.git.add(A=True)
-                    print(colored("Conflicts resolved. Committing changes.", "green"))
-                    _ = repo.index.commit(f"Resolved conflicts for revert to {refspec}")
+                    print(
+                        colored(
+                            "Conflicts resolved. Committing changes.", "green"
+                        )
+                    )
+                    _ = repo.index.commit(
+                        f"Resolved conflicts for revert to {refspec}"
+                    )
                     return
                 else:
                     print(colored(f"Error during revert: {e}", "red"))
@@ -319,6 +371,10 @@ class GitSyncer:
             limit (int): The number of commits to show in the log. Defaults to 10.
         """
         repo = self.instance
+        if not repo.heads:
+            print(colored("Commit Log:", "blue"))
+            print(colored("No commits found.", "yellow"))
+            return
         if pretty:
             log_entries = repo.git.log(
                 "--pretty=format:%h - %an, %ar : %s", n=limit

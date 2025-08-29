@@ -1,8 +1,8 @@
 import sys
 from collections.abc import Callable, Mapping
 from io import StringIO
-from pathlib import Path
-from typing import cast
+from pathlib import Path, PosixPath
+from typing import Any, cast, override
 
 import orjson
 import tomlkit
@@ -10,40 +10,44 @@ from escudeiro.data import asdict, fromdict
 from escudeiro.ds import CallableRegistry
 from escudeiro.misc import jsonx
 from orjson import JSONDecodeError
-from ruamel.yaml import YAML, YAMLError
+from ruamel.yaml import YAML, Representer, YAMLError
 from termcolor import colored
-from tomlkit.exceptions import TOMLKitError
+from tomlkit.exceptions import ConvertError, TOMLKitError
+from tomlkit.items import Item, String
 
 from dotfile_manager.utils import ValidationError
 
 from .concepts import ManifestFormat
 from .schema import Dotfile, Manifest
 
-yaml_loader = YAML()
+yaml_instance = YAML()
+
 
 loaders = CallableRegistry[ManifestFormat, Callable[[Path], Manifest]](
-    ManifestFormat, prefix="_loader_"
+    ManifestFormat, prefix="loader_"
 )
 dumpers = CallableRegistry[ManifestFormat, Callable[[Manifest], str]](
-    ManifestFormat, prefix="_dump_"
+    ManifestFormat, prefix="dump_"
 )
 
 
 @loaders
-def _loader_yaml(manifest_path: Path) -> Manifest:
+def loader_yaml(manifest_path: Path) -> Manifest:
     try:
         with open(manifest_path) as stream:
-            output_map = yaml_loader.load(stream)
+            output_map = yaml_instance.load(stream)
         output_map.setdefault("original_format", ManifestFormat.YAML)
         return fromdict(Manifest, output_map)
     except YAMLError as e:
         raise ValidationError(f"Error parsing YAML manifest: {e}")
     except (KeyError, TypeError, ValueError) as e:
-        raise ValidationError(f"Error converting YAML manifest data: {e}") from e
+        raise ValidationError(
+            f"Error converting YAML manifest data: {e}"
+        ) from e
 
 
 @loaders
-def _loader_json(manifest_path: Path) -> Manifest:
+def loader_json(manifest_path: Path) -> Manifest:
     try:
         with open(manifest_path) as stream:
             output_map = jsonx.load(stream)
@@ -53,8 +57,26 @@ def _loader_json(manifest_path: Path) -> Manifest:
         raise ValidationError(f"Error parsing JSON manifest: {e}")
 
 
+class PathItem(String):
+    @override
+    def unwrap(self) -> Path:
+        return Path(super().unwrap())
+
+
+def path_encoder(obj: Any) -> Item:
+    if isinstance(obj, Path):
+        return PathItem.from_raw(str(obj))
+    else:
+        # we cannot convert this, but give other custom converters a
+        # chance to run
+        raise ConvertError
+
+
+_ = tomlkit.register_encoder(path_encoder)
+
+
 @loaders
-def _loader_toml(manifest_path: Path) -> Manifest:
+def loader_toml(manifest_path: Path) -> Manifest:
     try:
         with open(manifest_path) as stream:
             output_map = cast(Mapping, tomlkit.load(stream))["dotfile_manager"]
@@ -63,11 +85,13 @@ def _loader_toml(manifest_path: Path) -> Manifest:
     except (TOMLKitError, KeyError) as e:
         raise ValidationError(f"Error parsing TOML manifest: {e}")
     except (KeyError, TypeError, ValueError) as e:
-        raise ValidationError(f"Error converting TOML manifest data: {e}") from e
+        raise ValidationError(
+            f"Error converting TOML manifest data: {e}"
+        ) from e
 
 
 @dumpers
-def _dump_yaml(manifest: Manifest) -> str:
+def dump_yaml(manifest: Manifest) -> str:
     """
     Dumps the manifest to a YAML string.
 
@@ -78,14 +102,16 @@ def _dump_yaml(manifest: Manifest) -> str:
         str: The YAML representation of the manifest.
     """
     manifest_dict = dict(asdict(manifest))
-    _ = manifest_dict.pop("original_format", None)  # Remove original_format if present
+    _ = manifest_dict.pop(
+        "original_format", None
+    )  # Remove original_format if present
     stream = StringIO()
-    yaml_loader.dump(manifest_dict, stream)
+    yaml_instance.dump(manifest_dict, stream)
     return stream.getvalue()
 
 
 @dumpers
-def _dump_json(manifest: Manifest) -> str:
+def dump_json(manifest: Manifest) -> str:
     """
     Dumps the manifest to a JSON string.
 
@@ -96,11 +122,14 @@ def _dump_json(manifest: Manifest) -> str:
         str: The JSON representation of the manifest.
     """
     output = dict(asdict(manifest))
-    _ = output.pop("original_format", None)  # Remove original_format if present
+    _ = output.pop(
+        "original_format", None
+    )  # Remove original_format if present
     return jsonx.dumps(output, option=orjson.OPT_INDENT_2)
 
+
 @dumpers
-def _dump_toml(manifest: Manifest) -> str:
+def dump_toml(manifest: Manifest) -> str:
     """
     Dumps the manifest to a TOML string.
 
@@ -114,6 +143,7 @@ def _dump_toml(manifest: Manifest) -> str:
     _ = output.pop("original_format", None)
     # Remove original_format if present
     return tomlkit.dumps({"dotfile_manager": output})
+
 
 def validate_manifest_path(
     manifest_path: Path, manifest_format: ManifestFormat
@@ -139,13 +169,15 @@ def validate_manifest_path(
         if manifest_format is ManifestFormat.PRESUMED:
             manifest_format = ManifestFormat.TOML
         # rename the file to include the default extension
-        manifest_path = manifest_path.with_suffix(
-            f".{manifest_format}"
-        )
+        manifest_path = manifest_path.with_suffix(f".{manifest_format}")
     if not manifest_path.exists():
-        raise ValidationError(f"Manifest file does not exist: '{manifest_path}'")
+        raise ValidationError(
+            f"Manifest file does not exist: '{manifest_path}'"
+        )
     if not manifest_path.is_file():
-        raise ValidationError(f"Manifest path is not a file: '{manifest_path}'")
+        raise ValidationError(
+            f"Manifest path is not a file: '{manifest_path}'"
+        )
     if manifest_format is ManifestFormat.PRESUMED:
         extension = manifest_path.suffix.strip(".")
         manifest_format = ManifestFormat(extension)
@@ -164,7 +196,9 @@ def print_manifest(manifest: Manifest) -> None:
         manifest (Manifest): The manifest to print
     """
 
-    print(colored(tomlkit.dumps({"dotfile_manager": asdict(manifest)}), "green"))
+    print(
+        colored(tomlkit.dumps({"dotfile_manager": asdict(manifest)}), "green")
+    )
     if sys.stdout.isatty():
         print(colored("\nManifest printed successfully.", "green"))
     else:
@@ -174,6 +208,7 @@ def print_manifest(manifest: Manifest) -> None:
                 "yellow",
             )
         )
+
 
 def print_dotfiles(manifest: Manifest) -> None:
     """
@@ -194,7 +229,7 @@ def print_dotfiles(manifest: Manifest) -> None:
         if not dflocation.exists():
             state = "broken, no matching file in dotfile manager folder"
         elif location.is_symlink():
-            if  dflocation.resolve() != location.resolve():
+            if dflocation.resolve() != location.resolve():
                 state = "broken, symlink points to a different file"
             else:
                 state = "linked"
@@ -209,6 +244,7 @@ def print_dotfiles(manifest: Manifest) -> None:
                 "cyan",
             )
         )
+
 
 def resolve_dfman_path(dotfile: Dotfile, manifest: Manifest) -> Path:
     """
@@ -227,8 +263,9 @@ def resolve_dfman_path(dotfile: Dotfile, manifest: Manifest) -> Path:
         dflocation = manifest.root / dflocation
     elif not dflocation.relative_to(manifest.root):
         dflocation = manifest.root / dflocation.relative_to(Path.home())
-    
+
     return dflocation
+
 
 def resolve_location(dotfile: Dotfile, manifest: Manifest) -> Path:
     """

@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 
 [[package]]
@@ -79,13 +79,14 @@ dependencies = [
 dev = [
     { name = "basedpyright" },
     { name = "build" },
+    { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "cyclopts", specifier = ">=3.19.0" },
-    { name = "escudeiro", specifier = ">=0.2.9" },
+    { name = "escudeiro", specifier = ">=0.2.17" },
     { name = "gitpython", specifier = ">=3.1.44" },
     { name = "questionary", specifier = ">=2.1.0" },
     { name = "ruamel-yaml", specifier = ">=0.18.14" },
@@ -97,6 +98,7 @@ requires-dist = [
 dev = [
     { name = "basedpyright", specifier = ">=1.29.4" },
     { name = "build", specifier = ">=1.2.2.post1" },
+    { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.11.13" },
 ]
 
@@ -120,18 +122,19 @@ wheels = [
 
 [[package]]
 name = "escudeiro"
-version = "0.2.9"
+version = "0.2.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "orjson" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/af/08/3a2904ec67d3f7a7b5dd69e0b0877a3fb60aea291ed9bd729cd2be484a43/escudeiro-0.2.9.tar.gz", hash = "sha256:b934fb033ca9737f32bf0d7ae0cc30cdab338f0efd45d72e24b8b67a69e83adc", size = 201255, upload-time = "2025-07-06T06:52:34.762Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c2/80/bfad35b173f464c76296b3e379e9fdfa617247a042f212d7dc767e3c963c/escudeiro-0.2.17.tar.gz", hash = "sha256:a3398ec9bb09f8182f99752a12ec3f2fc69ccc5b27c5a0823203f750eb46ed6c", size = 237627, upload-time = "2025-08-18T05:41:43.883Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/67/e9bdd8a20f9510a489290c2ab1f0108812197f7242906bfc510ac14d3cb0/escudeiro-0.2.9-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ad10171298923821181d1d3f620d9749deddb1a22c407235d23f32835b8e7233", size = 1244610, upload-time = "2025-07-06T06:52:26.688Z" },
-    { url = "https://files.pythonhosted.org/packages/46/94/2fc440004a9d32f08336dd586004855d2ed401459e6c207b0d2677720aa6/escudeiro-0.2.9-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:43a10dcbddc8dc5059dee732e9b98ed8a7ef5b7ca6b87812f2c1e6099e71aabb", size = 1244677, upload-time = "2025-07-06T06:52:29.457Z" },
-    { url = "https://files.pythonhosted.org/packages/71/47/48fb551a935a9f37b46708b5fbb8723a9719ef75b7792cb01ab1ab96391b/escudeiro-0.2.9-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:7dfa7aac1830b1c1ed3c40afd73420fb4b84c608a1110d79de7b148623dbb4d2", size = 1397325, upload-time = "2025-07-06T06:52:32.33Z" },
-    { url = "https://files.pythonhosted.org/packages/ef/46/f091581a5b86dd608514f5526279a47d20045b534391941eca068de88e71/escudeiro-0.2.9-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:3ef8eb7cef7c278624ef27e20af6a91335fc0f319f8240bf219b14119bd9df03", size = 1241329, upload-time = "2025-07-06T06:52:50.058Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/e5/47a9455eb8c3e2f555b3548bc3abefe2809ad8caddb61a6725bdd84e16a5/escudeiro-0.2.17-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4ec21e319d606b46d0bf37fdc0d8e325fb039b8710b009ad930d5ca483df4c77", size = 1254229, upload-time = "2025-08-18T05:41:36.718Z" },
+    { url = "https://files.pythonhosted.org/packages/54/ed/ba12efcdea64cd24c51cbe607cb98d6e392025591f5d89775251c29baa31/escudeiro-0.2.17-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:f90315d70e142a3121f922de2a572d51f3a03dc7c9675e4eecb8a96c34139925", size = 1254204, upload-time = "2025-08-18T05:41:39.454Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/8f/ccf53decd7b88d0bfbaed57098e876adf280a613ac4de67b100c58c243d5/escudeiro-0.2.17-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:29617433c6eb2b1928e2c1abe40d5127bb0b63de20ed8dc0414dbbc8219aedd5", size = 1433849, upload-time = "2025-08-18T05:41:41.747Z" },
+    { url = "https://files.pythonhosted.org/packages/73/72/e0528300046062f973ef83cb97b04b3bb0b38c5e17ceaf664f791544fb57/escudeiro-0.2.17-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:b5ac4a25258776f1e4f9635786b96ddf739a6d53b21411f063634cbfd5ca0a2d", size = 1256097, upload-time = "2025-08-18T05:41:48.75Z" },
+    { url = "https://files.pythonhosted.org/packages/63/3c/0d21c32e162bfbf6a2eb3c009e500fd38480b23a941d3036f364e848af75/escudeiro-0.2.17-cp313-cp313-win_amd64.whl", hash = "sha256:0f3ab905187fac804e2dcc2028336b50b6a42ed54349bc1222d1f81c51b933d4", size = 1119085, upload-time = "2025-08-20T14:04:14.925Z" },
 ]
 
 [[package]]
@@ -156,6 +159,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c0/89/37df0b71473153574a5cdef8f242de422a0f5d26d7a9e231e6f169b4ad14/gitpython-3.1.44.tar.gz", hash = "sha256:c87e30b26253bf5418b01b0660f818967f3c503193838337fe5e573331249269", size = 214196, upload-time = "2025-01-02T07:32:43.59Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1d/9a/4114a9057db2f1462d5c8f8390ab7383925fe1ac012eaa42402ad65c2963/GitPython-3.1.44-py3-none-any.whl", hash = "sha256:9e0e10cda9bed1ee64bc9a6de50e7e38a9c9943241cd7f585f6df3ed28011110", size = 207599, upload-time = "2025-01-02T07:32:40.731Z" },
+]
+
+[[package]]
+name = "iniconfig"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz", hash = "sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7", size = 4793, upload-time = "2025-03-19T20:09:59.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
 ]
 
 [[package]]
@@ -228,6 +240,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pluggy"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.51"
 source = { registry = "https://pypi.org/simple" }
@@ -255,6 +276,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e7/82/28175b2414effca1cdac8dc99f76d660e7a4fb0ceefa4b4ab8f5f6742925/pyproject_hooks-1.2.0.tar.gz", hash = "sha256:1e859bd5c40fae9448642dd871adf459e5e2084186e8d2c2a79a824c970da1f8", size = 19228, upload-time = "2024-09-29T09:24:13.293Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/24/12818598c362d7f300f18e74db45963dbcb85150324092410c8b49405e42/pyproject_hooks-1.2.0-py3-none-any.whl", hash = "sha256:9e5c6bfa8dcc30091c74b0cf803c81fdd29d94f01992a7707bc97babb1141913", size = 10216, upload-time = "2024-09-29T09:24:11.978Z" },
+]
+
+[[package]]
+name = "pytest"
+version = "8.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/ba/45911d754e8eba3d5a841a5ce61a65a685ff1798421ac054f85aa8747dfb/pytest-8.4.1.tar.gz", hash = "sha256:7c67fd69174877359ed9371ec3af8a3d2b04741818c51e5e99cc1742251fa93c", size = 1517714, upload-time = "2025-06-18T05:48:06.109Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/16/c8a903f4c4dffe7a12843191437d7cd8e32751d5de349d45d3fe69544e87/pytest-8.4.1-py3-none-any.whl", hash = "sha256:539c70ba6fcead8e78eebbf1115e8b589e7565830d7d006a8723f19ac8a0afb7", size = 365474, upload-time = "2025-06-18T05:48:03.955Z" },
 ]
 
 [[package]]

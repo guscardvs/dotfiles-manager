@@ -1,16 +1,14 @@
-import itertools
 import os
 import sys
-from collections import deque
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC
-from functools import wraps
+from functools import partial, wraps
 from itertools import islice
 from pathlib import Path
-from typing import Any, Literal
+from typing import override
 
 from escudeiro.data import data, field
-from escudeiro.misc import TimeZone, lazymethod, now
+from escudeiro.misc import Caster, TimeZone, autopath, lazymethod, now
 from termcolor import colored
 
 LOOKUPS_MAX_SIZE = 10  # Maximum number of lookups allowed for a PartialEntry
@@ -29,7 +27,11 @@ class PartialEntry:
     """
 
     name: str
-    lookups: Iterable[Path] = field(default=(), fromdict=tuple)
+    lookups: Iterable[Path] = field(
+        default=(),
+        fromdict=Caster(partial(map, autopath)).join(tuple),
+        asdict=Caster(partial(map, Path.as_posix)).join(tuple),
+    )
 
     def __post_init__(self):
         """
@@ -52,6 +54,7 @@ class PartialEntry:
                 return str(result)
         return self.name
 
+    @override
     def __str__(self) -> str:
         """
         Returns the string representation of the partial entry.
@@ -82,6 +85,7 @@ class ValidationError(Exception):
     This is used to indicate that a validation error has occurred.
     """
 
+    @override
     def __init__(self, message: str):
         super().__init__(message)
         self.message: str = message
@@ -104,7 +108,8 @@ def handle_error[**P, T](func: Callable[P, T]) -> Callable[P, T]:
             print(colored("This feature is not implemented yet.", "yellow"))
             print(
                 colored(
-                    "Please open an issue on GitHub to request this feature.", "yellow"
+                    "Please open an issue on GitHub to request this feature.",
+                    "yellow",
                 )
             )
             sys.exit(1)
@@ -126,12 +131,13 @@ def load_path(loc: str | Path, home: Path | None = None) -> Path:
     """
     if home is None:
         home = Path.home()
-    path = Path(loc).expanduser()
+    path = autopath(loc).expanduser()
     if not path.is_absolute():
         path = home / path
     return path
 
 
+# Set the timezone to the system's local timezone or UTC if not available
 timezone = TimeZone(now().astimezone().tzinfo or UTC)
 
 

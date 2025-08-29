@@ -2,8 +2,8 @@ from collections.abc import Collection
 from functools import partial
 from pathlib import Path
 
-from escudeiro.config import utils
 from escudeiro.data import data, field
+from escudeiro.misc import autopath
 
 from dotfile_manager.manifest.concepts import ManifestFormat
 from dotfile_manager.utils import PartialEntry
@@ -16,18 +16,19 @@ class Dotfile:
     dflocation: str = ""
     description: str = ""
 
+
 as_tuple_field = partial(field, fromdict=list)
-_as_path = utils.instance_is_casted(Path, Path)
 
 
 def find_or_create_path(pathstr: str | Path) -> Path:
     """
     Converts a string path to a Path object, expanding user directories.
     """
-    path = _as_path(pathstr).expanduser().resolve()
+    path = autopath(pathstr).expanduser().resolve()
     if not path.exists():
         path.mkdir(parents=True, exist_ok=True)
     return path
+
 
 def path_as_posix(path: Path) -> str:
     """
@@ -53,5 +54,5 @@ class Manifest:
         "bash", map(Path, ("/usr/bin", "/bin", "/usr/local/bin", "~/.local/bin"))
     )
     repository_branch: str = "main"
-    dotfiles: list[Dotfile] =field(default_factory=list)
+    dotfiles: list[Dotfile] = field(default_factory=list)
     pinned_hash: str = ""

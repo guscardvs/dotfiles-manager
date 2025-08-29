@@ -91,5 +91,5 @@ def persist_changes(manifest: Manifest, source: Path):
     if not source.exists():
         source.parent.mkdir(parents=True, exist_ok=True)
 
-    source.write_text(dumpers[manifest.original_format](manifest))
+    _ = source.write_text(dumpers[manifest.original_format](manifest))
     print(colored(f"Manifest file {source} updated.", "yellow"))

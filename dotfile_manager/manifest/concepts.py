@@ -13,9 +13,16 @@ class ManifestFormat(ValueEnum, KebabEnum):
     YAML = auto()
     TOML = auto()
     PRESUMED = auto()
-    YML = "yaml"
+    YML = YAML
 
     @override
     @classmethod
     def _missing_(cls, value: object) -> "ManifestFormat":
         return super()._missing_(value) or cls.PRESUMED
+
+    @classmethod
+    def valid(cls) -> tuple["ManifestFormat", ...]:
+        """
+        Returns a tuple of valid manifest formats (excluding PRESUMED).
+        """
+        return tuple(fmt for fmt in cls if fmt is not cls.PRESUMED)

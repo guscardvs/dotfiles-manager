@@ -7,9 +7,10 @@ from typing import Annotated
 
 import questionary
 from cyclopts import App, Parameter
-from escudeiro.misc import next_or
+from escudeiro.misc import autopath, next_or
 from termcolor import colored
 
+from dotfile_manager.constants import CONFIG_DIR, get_default_repository_path
 from dotfile_manager.linker.pure import USUAL_DOTFILES, PureLinker
 from dotfile_manager.manifest.concepts import ManifestFormat
 from dotfile_manager.manifest.diffs import persist_changes
@@ -26,7 +27,6 @@ from dotfile_manager.syncer.git import GitSyncer
 from dotfile_manager.utils import (
     PartialEntry,
     ValidationError,
-    configdir,
     get_timezone,
     handle_error,
     load_path,
@@ -35,8 +35,6 @@ from dotfile_manager.utils import (
 app = App(
     name="Dotfile Manager",
 )
-
-CONFIG_DIR = configdir() / "dfman"
 
 
 @app.command
@@ -85,8 +83,12 @@ def sync(
     manifest = loaders[manifest_format](manifest_path)
 
     syncer = GitSyncer.from_manifest(manifest)
-    if pull:
+
+    if pull and not syncer.has_pending_changes():
         syncer.pull()
+    else:
+        print(colored("There are pending changes to pull.", "yellow"))
+
     if save:
         syncer.apply(message)
         syncer.save()
@@ -162,16 +164,15 @@ def link(
     if not dotfiles:
         print(
             colored(
-                "No dotfiles specified. Linking all dotfiles in the manifest.", "yellow"
+                "No dotfiles specified. Linking all dotfiles in the manifest.",
+                "yellow",
             )
         )
         linker.link_all()
         print(colored("All dotfiles linked successfully.", "green"))
         return
     dfs: list[Dotfile] = []
-    for df in dotfiles:
-        if isinstance(df, str):
-            df = Path(df)
+    for df in map(autopath, dotfiles):
         if df.is_absolute():
             rel_df = df.relative_to(Path.home())
         else:
@@ -240,7 +241,9 @@ def from_system(
             return
         dotfiles = questionary.checkbox(
             "Select dotfiles to include in the manifest:",
-            choices=[questionary.Choice(df, checked=True) for df in USUAL_DOTFILES],
+            choices=[
+                questionary.Choice(df, checked=True) for df in USUAL_DOTFILES
+            ],
         ).ask()
         if not dotfiles:
             print(colored("No dotfiles selected. Exiting.", "yellow"))
@@ -294,7 +297,7 @@ def download(
     branch: str = "main",
     manifest_path: Path = CONFIG_DIR,
     manifest_format: ManifestFormat = ManifestFormat.PRESUMED,
-    repository_path: Path = Path.home() / ".dotfiles",
+    repository_path: Path | None = None,
     pinned_hash: str | None = None,
     force: bool = False,
 ):
@@ -310,7 +313,7 @@ def download(
         pinned_hash (str | None): Optional pinned hash for the repository.
         force (bool): Whether to overwrite the existing manifest symlink if it exists.
     """
-
+    repository_path = get_default_repository_path(repository_path)
     with GitSyncer.download(
         repository_url=repository_url,
         repository_branch=branch,
@@ -324,7 +327,9 @@ def download(
         elif not manifest_path.is_dir():
             shutil.rmtree(manifest_path)
             raise ValidationError(f"{manifest_path} is not a directory.")
-        manifest_path = manifest_path.with_suffix(f".{manifest.original_format.value}")
+        manifest_path = manifest_path.with_suffix(
+            f".{manifest.original_format.value}"
+        )
         if manifest_path.exists() and force:
             manifest_path.unlink()
         elif manifest_path.exists():
@@ -369,11 +374,9 @@ def edit_file(
         )
     elif not editor:
         editor = manifest.default_editor
-
-    if isinstance(file_path, str):
-        file_path = Path(file_path)
-    if isinstance(target_path, str):
-        target_path = Path(target_path)
+    file_path = autopath(file_path)
+    if target_path is not None:
+        target_path = autopath(target_path)
         if not target_path.is_absolute():
             target_path = Path.home() / target_path
 
@@ -397,7 +400,10 @@ def edit_file(
     if file_path.exists():
         if not file_path.is_file():
             raise ValidationError(f"{file_path} is not a file.")
-        if not target_path.is_symlink() or target_path.resolve() != file_path.resolve():
+        if (
+            not target_path.is_symlink()
+            or target_path.resolve() != file_path.resolve()
+        ):
             raise ValidationError(
                 f"Another file or symlink already exists at {target_path}. "
             )
@@ -429,7 +435,8 @@ def edit_file(
     if not file_path.exists():
         print(
             colored(
-                f"File {file_path} does not exist after editing, ending...", "yellow"
+                f"File {file_path} does not exist after editing, ending...",
+                "yellow",
             )
         )
         return
@@ -438,7 +445,10 @@ def edit_file(
         return
     target_path.symlink_to(file_path, target_is_directory=False)
     print(
-        colored(f"Created symlink at {target_path} pointing to {file_path}.", "green")
+        colored(
+            f"Created symlink at {target_path} pointing to {file_path}.",
+            "green",
+        )
     )
     created_at = get_timezone().today().isoformat()
     dotfile = Dotfile(
@@ -587,7 +597,11 @@ def unlink(
             try:
                 linker.unlink(dotfile)
             except ValidationError as e:
-                print(colored(f"Error unlinking {dotfile.name}: {e.message}", "red"))
+                print(
+                    colored(
+                        f"Error unlinking {dotfile.name}: {e.message}", "red"
+                    )
+                )
             else:
                 print(colored(f"Unlinked dotfile: {dotfile.name}", "green"))
     print(colored("All dotfiles unlinked successfully.", "green"))
@@ -620,9 +634,7 @@ def remove(
     linker = PureLinker(manifest=manifest)
 
     dfs: list[Dotfile] = []
-    for df in dotfiles:
-        if isinstance(df, str):
-            df = Path(df)
+    for df in map(autopath, dotfiles):
         if df.is_absolute():
             rel_df = df.relative_to(Path.home())
         else:
@@ -655,7 +667,11 @@ def remove(
                 dflocation = manifest.root / dotfile.dflocation
                 if dflocation.exists():
                     dflocation.unlink()
-                    print(colored(f"Removed dotfile location: {dflocation}", "green"))
+                    print(
+                        colored(
+                            f"Removed dotfile location: {dflocation}", "green"
+                        )
+                    )
             else:
                 print(
                     colored(
@@ -665,13 +681,17 @@ def remove(
                 )
             print(colored(f"Removed dotfile: {dotfile.name}", "green"))
         except ValidationError as e:
-            print(colored(f"Error removing {dotfile.name}: {e.message}", "red"))
+            print(
+                colored(f"Error removing {dotfile.name}: {e.message}", "red")
+            )
 
     # Save the updated manifest
     with open(manifest_path, "w") as f:
         _ = f.write(dumpers[manifest_format](manifest))
 
-    print(colored("Dotfiles removed and manifest updated successfully.", "green"))
+    print(
+        colored("Dotfiles removed and manifest updated successfully.", "green")
+    )
     persist_changes(manifest, manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
@@ -837,8 +857,7 @@ def exec_(
         manifest_path, manifest_format
     )
     manifest = loaders[manifest_format](manifest_path)
-    if isinstance(dotfile, str):
-        dotfile = Path(dotfile)
+    dotfile = autopath(dotfile)
     if dotfile.is_absolute():
         relative_dotfile_loc = dotfile.relative_to(Path.home())
     else:
@@ -849,7 +868,9 @@ def exec_(
         for selected in manifest.dotfiles
         if selected.name == dotfile.name
         or selected.location
-        in map(Path.as_posix, [relative_dotfile_loc, dotfile, absolue_dotfile_loc])
+        in map(
+            Path.as_posix, [relative_dotfile_loc, dotfile, absolue_dotfile_loc]
+        )
     )
     if dfloc is None:
         raise ValidationError(f"Dotfile {dotfile} not found in the manifest.")
@@ -861,7 +882,9 @@ def exec_(
     if with_command:
         if not shutil.which(with_command):
             raise ValidationError(f"Command {with_command} not found in PATH.")
-        print(colored(f"Running command: {with_command} {dfloc_path}", "yellow"))
+        print(
+            colored(f"Running command: {with_command} {dfloc_path}", "yellow")
+        )
         _ = subprocess.run([with_command, str(dfloc_path)], check=True)
     else:
         with open(dfloc_path) as f:
@@ -870,7 +893,16 @@ def exec_(
 
 @app.command
 @handle_error
-def init(ask: bool = True):
+def init(
+    repository_url: str,
+    manifest_format: ManifestFormat = ManifestFormat.TOML,
+    manifest_path: Path = CONFIG_DIR,
+    repository_path: Path | None = None,
+    repository_branch: str = "main",
+    pinned_hash: str = "",
+    default_terminal: str = "",
+    default_editor: str = "",
+):
     """
     Initialize the dotfile manager.
     This command will create the default manifest file and set up the dotfile manager.
@@ -878,112 +910,35 @@ def init(ask: bool = True):
     Args:
         ask (bool): Whether to ask for confirmation before initializing.
     """
-    if not ask:
-        print(
-            colored(
-                "Skipping questionaire. Initializing dotfile manager...",
-                "yellow",
-            )
-        )
-        manifest_format = ManifestFormat.TOML
-        manifest_path = CONFIG_DIR
-        if manifest_path.exists():
-            print(
-                colored(
-                    f"Manifest file {manifest_path} already exists. Please remove it or use a different path.",
-                    "yellow",
-                )
-            )
-            return
-        manifest_path = manifest_path.with_suffix(f".{manifest_format.value}")
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest = Manifest(
-            root=Path.home() / ".dotfiles",
-            repository_url="",
-            original_format=manifest_format,
-            extra_paths=[],
-            default_terminal="",
-            default_editor="",
-            default_shell=PartialEntry(
-                "bash",
-                map(Path, ("/usr/bin", "/bin", "/usr/local/bin", "~/.local/bin")),
-            ),
-            repository_branch="main",
-            dotfiles=[],
-            pinned_hash="",
-        )
-    else:
-        manifest_config_path = CONFIG_DIR
-        manifest_format = questionary.select(
-            "Select the manifest format:",
-            choices=[
-                questionary.Choice(ManifestFormat.TOML, checked=True),
-                questionary.Choice(ManifestFormat.YAML),
-                questionary.Choice(ManifestFormat.JSON),
-            ],
-        ).ask()
-        manifest_path = manifest_config_path.with_suffix(f".{manifest_format}")
-        if manifest_path.exists():
-            print(
-                colored(
-                    f"Manifest file {manifest_path} already exists. Please remove it or use a different path.",
-                    "yellow",
-                )
-            )
-            return
 
-        def _validate_path(path: str | Path) -> Path:
-            """
-            Validate the provided path for the manifest root.
-            Ensures that the path is a directory and is writable.
-            """
-            path = Path(path).expanduser().resolve()
-            if not path.is_relative_to(Path.home()):
-                raise ValidationError(
-                    "The manifest root must be a subdirectory of your home directory."
-                )
-            return path
-
-        manifest = Manifest(
-            root=questionary.path(
-                "Enter the root directory for your dotfiles:",
-                default=(Path.home() / ".dotfiles").as_posix(),
-                validate=_validate_path,
-                only_directories=True,
-            ).ask(),
-            repository_url=questionary.text(
-                "Enter the URL of your dotfiles repository",
-            ).ask(),
-            original_format=manifest_format,
-            extra_paths=(),
-            default_terminal=questionary.text(
-                "Enter your default terminal (leave empty for none):",
-                default="",
-            ).ask(),
-            default_editor=questionary.text(
-                "Enter your default editor (leave empty for none):",
-                default="",
-            ).ask(),
-            default_shell=PartialEntry(
-                "bash",
-                map(Path, ("/usr/bin", "/bin", "/usr/local/bin", "~/.local/bin")),
-            ),
-            repository_branch=questionary.text(
-                "Enter the branch of your repository to use (default: main):",
-                default="main",
-            ).ask(),
-            dotfiles=[],
-            pinned_hash=questionary.text(
-                "Enter the pinned hash for your repository (leave empty for none):",
-                default="",
-            ).ask(),
+    manifest_path = manifest_path.with_suffix(f".{manifest_format.value}")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    if manifest_path.exists():
+        raise ValidationError(
+            f"Manifest path {manifest_path} already exists. Please remove it or use a different path."
         )
-
-    source_path = manifest.root / manifest_path.name
-    if source_path.exists():
+    repository_path = get_default_repository_path(repository_path)
+    source_path = repository_path / manifest_path.name
+    if repository_path.exists() and source_path.exists():
         raise ValidationError(
             f"Manifest file {source_path} already exists. Please remove it or use a different path."
         )
+    manifest = Manifest(
+        root=repository_path,
+        repository_url=repository_url,
+        original_format=manifest_format,
+        extra_paths=[],
+        default_terminal=default_terminal,
+        default_editor=default_editor,
+        default_shell=PartialEntry(
+            "bash",
+            map(Path, ("/usr/bin", "/bin", "/usr/local/bin", "~/.local/bin")),
+        ),
+        repository_branch=repository_branch,
+        dotfiles=[],
+        pinned_hash=pinned_hash,
+    )
+
     persist_changes(manifest, source_path)
     manifest_path.symlink_to(source_path)
     print(
@@ -992,4 +947,4 @@ def init(ask: bool = True):
             "green",
         )
     )
-    _ = GitSyncer.init_git(manifest.root)
+    _ = GitSyncer.from_manifest(manifest).instance
