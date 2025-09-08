@@ -1,9 +1,8 @@
 from pathlib import Path
 
-from termcolor import colored
-
 from dotfile_manager.manifest.loader import dumpers
 from dotfile_manager.manifest.schema import Dotfile, Manifest
+from dotfile_manager.utils import print_colored
 
 
 def diff_manifest(left: Manifest, right: Manifest) -> tuple[Manifest, bool]:
@@ -92,4 +91,4 @@ def persist_changes(manifest: Manifest, source: Path):
         source.parent.mkdir(parents=True, exist_ok=True)
 
     _ = source.write_text(dumpers[manifest.original_format](manifest))
-    print(colored(f"Manifest file {source} updated.", "yellow"))
+    print_colored(f"Manifest file {source} updated.", "yellow")

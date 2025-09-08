@@ -149,3 +149,14 @@ def get_timezone() -> TimeZone:
         TimeZone: The current timezone.
     """
     return timezone
+
+
+def print_colored(text: str, color: str) -> None:
+    """
+    Prints text in a specified color.
+
+    Args:
+        text (str): The text to print.
+        color (str): The color to use.
+    """
+    print(colored(text, color))

@@ -9,12 +9,11 @@ from escudeiro.data import data
 from escudeiro.lazyfields import lazyfield
 from escudeiro.misc import next_or
 from git import BadName, GitCommandError, Repo
-from termcolor import colored
 
 from dotfile_manager.manifest.concepts import ManifestFormat
 from dotfile_manager.manifest.loader import loaders, validate_manifest_path
 from dotfile_manager.manifest.schema import Manifest
-from dotfile_manager.utils import ValidationError, get_timezone
+from dotfile_manager.utils import ValidationError, get_timezone, print_colored
 
 
 @data
@@ -65,7 +64,7 @@ class GitSyncer:
                     self.repository_path, initial_branch=self.repository_branch
                 )
         if not repo.remotes:
-            repo.create_remote("origin", self.repository_url)
+            _ = repo.create_remote("origin", self.repository_url)
         if self.pinned_hash:
             try:
                 commit = repo.commit(self.pinned_hash)
@@ -76,7 +75,7 @@ class GitSyncer:
             else:
                 if commit != repo.head.commit:
                     _ = repo.create_head("pinned_hash", self.pinned_hash)
-                    repo.heads.pinned_hash.checkout()
+                    _ = repo.heads.pinned_hash.checkout()
         return repo
 
     @classmethod
@@ -112,11 +111,9 @@ class GitSyncer:
         )
         if self.pinned_hash:
             raise ValidationError("Cannot sync changes with a pinned hash.")
-        print(
-            colored(
-                f"Repository {self.repository_path} synchronized successfully.",
-                "green",
-            )
+        print_colored(
+            f"Repository {self.repository_path} synchronized successfully.",
+            "green",
         )
 
     def pull(self) -> None:
@@ -126,11 +123,9 @@ class GitSyncer:
         repo = self.instance
         origin = repo.remote(name="origin")
         _ = origin.pull(refspec=f"{self.repository_branch}", rebase=True)
-        print(
-            colored(
-                f"Repository {self.repository_path} pulled successfully.",
-                "green",
-            )
+        print_colored(
+            f"Repository {self.repository_path} pulled successfully.",
+            "green",
         )
 
     def sync(self) -> None:
@@ -148,16 +143,14 @@ class GitSyncer:
         """
         repo = self.instance
         status = repo.git.status()
-        print(
-            colored(
-                f"Repository {self.repository_path} status:\n{status}", "blue"
-            )
+        print_colored(
+            f"Repository {self.repository_path} status:\n{status}", "blue"
         )
 
         if not repo.is_dirty(untracked_files=True):
-            print(colored("No changes to commit.", "green"))
+            print_colored("No changes to commit.", "green")
         else:
-            print(colored("There are changes to commit.", "yellow"))
+            print_colored("There are changes to commit.", "yellow")
 
     def has_pending_changes(self) -> bool:
         repo = self.instance
@@ -267,8 +260,8 @@ class GitSyncer:
             )
 
         if repo.head.object.hexsha == refspec:
-            print(
-                colored("Already at the specified commit or branch.", "yellow")
+            print_colored(
+                "Already at the specified commit or branch.", "yellow"
             )
             return
 
@@ -297,22 +290,18 @@ class GitSyncer:
         self._insist_revert(refspec)
 
         if repo.is_dirty(untracked_files=True):
-            print(
-                colored(
-                    "Repository has uncommitted changes after revert.",
-                    "yellow",
-                )
+            print_colored(
+                "Repository has uncommitted changes after revert.",
+                "yellow",
             )
             repo.git.add(A=True)
             repo.git.commit(m=f"Reverted to {refspec}")
         _ = remote.push(
             refspec=f"{self.repository_branch}:{self.repository_branch}"
         )
-        print(
-            colored(
-                f"Repository reverted to {refspec} and backup created at {backup_branch}.",
-                "green",
-            )
+        print_colored(
+            f"Repository reverted to {refspec} and backup created at {backup_branch}.",
+            "green",
         )
 
     def _insist_revert(self, refspec: str) -> None:
@@ -329,38 +318,32 @@ class GitSyncer:
                 break
             except GitCommandError as e:
                 if "nothing to revert" in str(e):
-                    print(colored("No changes to revert.", "yellow"))
+                    print_colored("No changes to revert.", "yellow")
                     return
                 elif "conflict" in str(e):
-                    print(
-                        colored("Merge conflict detected. Insisting.", "red")
-                    )
+                    print_colored("Merge conflict detected. Insisting.", "red")
                     unmerged = [
                         item
                         for item in repo.index.diff("HEAD")
                         if item.change_type == "U"
                     ]
                     for item in unmerged:
-                        print(colored(f"Unmerged file: {item.a_path}", "red"))
-                        print(
-                            colored(
-                                "Attempting to resolve conflicts automatically.",
-                                "yellow",
-                            )
+                        print_colored(f"Unmerged file: {item.a_path}", "red")
+                        print_colored(
+                            "Attempting to resolve conflicts automatically.",
+                            "yellow",
                         )
                         repo.git.checkout(item.b_path, theirs=True)
                         repo.git.add(A=True)
-                    print(
-                        colored(
-                            "Conflicts resolved. Committing changes.", "green"
-                        )
+                    print_colored(
+                        "Conflicts resolved. Committing changes.", "green"
                     )
                     _ = repo.index.commit(
                         f"Resolved conflicts for revert to {refspec}"
                     )
                     return
                 else:
-                    print(colored(f"Error during revert: {e}", "red"))
+                    print_colored(f"Error during revert: {e}", "red")
                     raise e
 
     def log(self, limit: int = 10, pretty: bool = True) -> None:
@@ -372,8 +355,8 @@ class GitSyncer:
         """
         repo = self.instance
         if not repo.heads:
-            print(colored("Commit Log:", "blue"))
-            print(colored("No commits found.", "yellow"))
+            print_colored("Commit Log:", "blue")
+            print_colored("No commits found.", "yellow")
             return
         if pretty:
             log_entries = repo.git.log(
@@ -382,11 +365,11 @@ class GitSyncer:
         else:
             log_entries = repo.git.log(n=limit).splitlines()
         if not log_entries:
-            print(colored("No commits found in the repository.", "yellow"))
+            print_colored("No commits found in the repository.", "yellow")
             return
-        print(colored("Commit Log:", "blue"))
+        print_colored("Commit Log:", "blue")
         for entry in log_entries:
-            print(colored(entry, "green"))
+            print_colored(entry, "green")
 
     def is_dirty(self) -> bool:
         """

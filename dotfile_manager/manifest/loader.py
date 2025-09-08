@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable, Mapping
 from io import StringIO
-from pathlib import Path, PosixPath
+from pathlib import Path
 from typing import Any, cast, override
 
 import orjson
@@ -10,12 +10,11 @@ from escudeiro.data import asdict, fromdict
 from escudeiro.ds import CallableRegistry
 from escudeiro.misc import jsonx
 from orjson import JSONDecodeError
-from ruamel.yaml import YAML, Representer, YAMLError
-from termcolor import colored
+from ruamel.yaml import YAML, YAMLError
 from tomlkit.exceptions import ConvertError, TOMLKitError
 from tomlkit.items import Item, String
 
-from dotfile_manager.utils import ValidationError
+from dotfile_manager.utils import ValidationError, print_colored
 
 from .concepts import ManifestFormat
 from .schema import Dotfile, Manifest
@@ -196,17 +195,16 @@ def print_manifest(manifest: Manifest) -> None:
         manifest (Manifest): The manifest to print
     """
 
-    print(
-        colored(tomlkit.dumps({"dotfile_manager": asdict(manifest)}), "green")
+    print_colored(
+        tomlkit.dumps({"dotfile_manager": asdict(manifest)}), "green"
     )
+
     if sys.stdout.isatty():
-        print(colored("\nManifest printed successfully.", "green"))
+        print_colored("\nManifest printed successfully.", "green")
     else:
-        print(
-            colored(
-                "Manifest printed successfully. Use a terminal that supports color for better readability.",
-                "yellow",
-            )
+        print_colored(
+            "Manifest printed successfully. Use a terminal that supports color for better readability.",
+            "yellow",
         )
 
 
@@ -219,10 +217,10 @@ def print_dotfiles(manifest: Manifest) -> None:
     """
     dotfiles = manifest.dotfiles
     if not dotfiles:
-        print(colored("No dotfiles found in the manifest.", "yellow"))
+        print_colored("No dotfiles found in the manifest.", "yellow")
         return
 
-    print(colored("Dotfiles in the manifest:", "blue"))
+    print_colored("Dotfiles in the manifest:", "blue")
     for dotfile in dotfiles:
         location = resolve_location(dotfile, manifest)
         dflocation = resolve_dfman_path(dotfile, manifest)
@@ -238,11 +236,9 @@ def print_dotfiles(manifest: Manifest) -> None:
         else:
             state = "broken, location exists but is not a symlink"
 
-        print(
-            colored(
-                f"{dotfile.name} -> {dotfile.location} (dflocation: {dotfile.dflocation}, state: {state})",
-                "cyan",
-            )
+        print_colored(
+            f"{dotfile.name} -> {dotfile.location} (dflocation: {dotfile.dflocation}, state: {state})",
+            "cyan",
         )
 
 

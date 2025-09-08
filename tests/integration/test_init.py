@@ -207,7 +207,7 @@ class TestInit:
         repo = Repo.init(dfpath, initial_branch="develop")
         hashes = []
         for idx in range(3):
-            (dfpath / f"test{idx}.txt").write_text(f"Test {idx}")
+            _ = (dfpath / f"test{idx}.txt").write_text(f"Test {idx}")
             repo.git.add(A=True)
             commit = repo.index.commit(f"Saving file test{idx}.txt")
             hashes.append(commit.hexsha)
@@ -236,7 +236,7 @@ class TestInit:
         repo = Repo.init(dfpath, initial_branch="develop")
         hashes = []
         for idx in range(3):
-            (dfpath / f"test{idx}.txt").write_text(f"Test {idx}")
+            _ = (dfpath / f"test{idx}.txt").write_text(f"Test {idx}")
             repo.git.add(A=True)
             commit = repo.index.commit(f"Saving file test{idx}.txt")
             hashes.append(commit.hexsha)

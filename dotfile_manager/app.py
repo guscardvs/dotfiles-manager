@@ -8,7 +8,6 @@ from typing import Annotated
 import questionary
 from cyclopts import App, Parameter
 from escudeiro.misc import autopath, next_or
-from termcolor import colored
 
 from dotfile_manager.constants import CONFIG_DIR, get_default_repository_path
 from dotfile_manager.linker.pure import USUAL_DOTFILES, PureLinker
@@ -30,6 +29,7 @@ from dotfile_manager.utils import (
     get_timezone,
     handle_error,
     load_path,
+    print_colored,
 )
 
 app = App(
@@ -87,17 +87,15 @@ def sync(
     if pull and not syncer.has_pending_changes():
         syncer.pull()
     else:
-        print(colored("There are pending changes to pull.", "yellow"))
+        print_colored("There are pending changes to pull.", "yellow")
 
     if save:
         syncer.apply(message)
         syncer.save()
     if not pull and not save:
-        print(
-            colored(
-                "No action specified. Use --pull to pull changes or --save to save changes.",
-                "yellow",
-            )
+        print_colored(
+            "No action specified. Use --pull to pull changes or --save to save changes.",
+            "yellow",
         )
 
 
@@ -162,14 +160,12 @@ def link(
     manifest = loaders[manifest_format](manifest_path)
     linker = PureLinker(manifest=manifest)
     if not dotfiles:
-        print(
-            colored(
-                "No dotfiles specified. Linking all dotfiles in the manifest.",
-                "yellow",
-            )
+        print_colored(
+            "No dotfiles specified. Linking all dotfiles in the manifest.",
+            "yellow",
         )
         linker.link_all()
-        print(colored("All dotfiles linked successfully.", "green"))
+        print_colored("All dotfiles linked successfully.", "green")
         return
     dfs: list[Dotfile] = []
     for df in map(autopath, dotfiles):
@@ -184,26 +180,24 @@ def link(
             or selected.location in map(Path.as_posix, [rel_df, df])
         )
         if instance is None:
-            print(
-                colored(
-                    f"Dotfile {df} not found in the manifest. Skipping.",
-                    "yellow",
-                )
+            print_colored(
+                f"Dotfile {df} not found in the manifest. Skipping.",
+                "yellow",
             )
         else:
             dfs.append(instance)
     if not dfs:
-        print(colored("No dotfiles to link.", "yellow"))
+        print_colored("No dotfiles to link.", "yellow")
         return
     for dotfile in dfs:
         try:
             linker.link(dotfile)
         except ValidationError as e:
-            print(colored(f"Error linking {dotfile.name}: {e.message}", "red"))
+            print_colored(f"Error linking {dotfile.name}: {e.message}", "red")
         else:
-            print(colored(f"Linked dotfile: {dotfile.name}", "green"))
+            print_colored(f"Linked dotfile: {dotfile.name}", "green")
 
-    print(colored("All dotfiles linked successfully.", "green"))
+    print_colored("All dotfiles linked successfully.", "green")
 
 
 @app.command
@@ -227,12 +221,10 @@ def from_system(
         message (str | None): The commit message to use when saving changes.
     """
     if dotfiles is USUAL_DOTFILES:
-        print(
-            colored(
-                "No dotfiles specified. Using default dotfiles: "
-                + ", ".join(map(str, USUAL_DOTFILES)),
-                "yellow",
-            )
+        print_colored(
+            "No dotfiles specified. Using default dotfiles: "
+            + ", ".join(map(str, USUAL_DOTFILES)),
+            "yellow",
         )
         if not questionary.confirm(
             "Do you want to use the default dotfiles? (y/n)",
@@ -246,7 +238,7 @@ def from_system(
             ],
         ).ask()
         if not dotfiles:
-            print(colored("No dotfiles selected. Exiting.", "yellow"))
+            print_colored("No dotfiles selected. Exiting.", "yellow")
             return
 
     manifest_path, manifest_format = validate_manifest_path(
@@ -266,28 +258,26 @@ def from_system(
             syncer.save()
     except Exception as e:
         if not isinstance(e, ValidationError):
-            print(colored(f"Unexpected error: {e}", "red"))
+            print_colored(f"Unexpected error: {e}", "red")
             traceback.print_exc()
-        print(colored(f"Error while updating manifest: {e}", "red"))
+        print_colored(f"Error while updating manifest: {e}", "red")
         if backups:
-            print(colored("Restoring backups...", "yellow"))
+            print_colored("Restoring backups...", "yellow")
             linker.restore_backups(backups)
         return
     else:
         if backups:
-            print(
-                colored(
-                    "Backups created for existing dotfiles: "
-                    + ", ".join(f"{src} -> {dst}" for src, dst in backups),
-                    "yellow",
-                )
+            print_colored(
+                "Backups created for existing dotfiles: "
+                + ", ".join(f"{src} -> {dst}" for src, dst in backups),
+                "yellow",
             )
             if questionary.confirm(
                 "Do you want to delete the backups? (y/n)",
                 default=True,
             ).ask():
                 linker.delete_backups(backups)
-    print(colored("Manifest updated with system dotfiles.", "green"))
+    print_colored("Manifest updated with system dotfiles.", "green")
 
 
 @app.command
@@ -419,7 +409,7 @@ def edit_file(
         raise ValidationError(f"Editor {editor} not found in PATH.")
 
     editor_cmd = [editor, str(file_path)]
-    print(colored(f"Opening {file_path} in {editor}...", "green"))
+    print_colored(f"Opening {file_path} in {editor}...", "green")
     try:
         _ = subprocess.run(editor_cmd, check=True)
     except subprocess.CalledProcessError as e:
@@ -430,25 +420,21 @@ def edit_file(
         )
     except Exception as e:
         raise ValidationError(f"An unexpected error occurred: {e}")
-    print(colored(f"File {file_path} edited successfully.", "green"))
+    print_colored(f"File {file_path} edited successfully.", "green")
 
     if not file_path.exists():
-        print(
-            colored(
-                f"File {file_path} does not exist after editing, ending...",
-                "yellow",
-            )
+        print_colored(
+            f"File {file_path} does not exist after editing, ending...",
+            "yellow",
         )
         return
 
     if target_path.exists():
         return
     target_path.symlink_to(file_path, target_is_directory=False)
-    print(
-        colored(
-            f"Created symlink at {target_path} pointing to {file_path}.",
-            "green",
-        )
+    print_colored(
+        f"Created symlink at {target_path} pointing to {file_path}.",
+        "green",
     )
     created_at = get_timezone().today().isoformat()
     dotfile = Dotfile(
@@ -518,7 +504,7 @@ def edit_manifest(
     if shutil.which(editor) is None:
         raise ValidationError(f"Editor {editor} not found in PATH.")
     editor_cmd = [editor, str(manifest_path)]
-    print(colored(f"Opening {manifest_path} in {editor}...", "green"))
+    print_colored(f"Opening {manifest_path} in {editor}...", "green")
     try:
         _ = subprocess.run(editor_cmd, check=True)
     except subprocess.CalledProcessError as e:
@@ -529,7 +515,7 @@ def edit_manifest(
         )
     except Exception as e:
         raise ValidationError(f"An unexpected error occurred: {e}")
-    print(colored(f"Manifest {manifest_path} edited successfully.", "green"))
+    print_colored(f"Manifest {manifest_path} edited successfully.", "green")
     new_manifest = loaders[manifest_format](manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(new_manifest)
@@ -582,29 +568,25 @@ def unlink(
                 or selected.location in map(Path.as_posix, [rel_df, df])
             )
             if df is None:
-                print(
-                    colored(
-                        f"Dotfile {df} not found in the manifest. Skipping.",
-                        "yellow",
-                    )
+                print_colored(
+                    f"Dotfile {df} not found in the manifest. Skipping.",
+                    "yellow",
                 )
             else:
                 dfs.append(df)
         if not dfs:
-            print(colored("No dotfiles to unlink.", "yellow"))
+            print_colored("No dotfiles to unlink.", "yellow")
             return
         for dotfile in dfs:
             try:
                 linker.unlink(dotfile)
             except ValidationError as e:
-                print(
-                    colored(
-                        f"Error unlinking {dotfile.name}: {e.message}", "red"
-                    )
+                print_colored(
+                    f"Error unlinking {dotfile.name}: {e.message}", "red"
                 )
             else:
-                print(colored(f"Unlinked dotfile: {dotfile.name}", "green"))
-    print(colored("All dotfiles unlinked successfully.", "green"))
+                print_colored(f"Unlinked dotfile: {dotfile.name}", "green")
+    print_colored("All dotfiles unlinked successfully.", "green")
 
 
 @app.command
@@ -646,17 +628,15 @@ def remove(
             or selected.location in map(Path.as_posix, [rel_df, df])
         )
         if instance is None:
-            print(
-                colored(
-                    f"Dotfile {df} not found in the manifest. Skipping.",
-                    "yellow",
-                )
+            print_colored(
+                f"Dotfile {df} not found in the manifest. Skipping.",
+                "yellow",
             )
         else:
             dfs.append(instance)
 
     if not dfs:
-        print(colored("No dotfiles to remove.", "yellow"))
+        print_colored("No dotfiles to remove.", "yellow")
         return
 
     for dotfile in dfs:
@@ -667,31 +647,23 @@ def remove(
                 dflocation = manifest.root / dotfile.dflocation
                 if dflocation.exists():
                     dflocation.unlink()
-                    print(
-                        colored(
-                            f"Removed dotfile location: {dflocation}", "green"
-                        )
+                    print_colored(
+                        f"Removed dotfile location: {dflocation}", "green"
                     )
             else:
-                print(
-                    colored(
-                        f"Dotfile {dotfile.name} has no dflocation. Skipping unlink.",
-                        "yellow",
-                    )
+                print_colored(
+                    f"Dotfile {dotfile.name} has no dflocation. Skipping unlink.",
+                    "yellow",
                 )
-            print(colored(f"Removed dotfile: {dotfile.name}", "green"))
+            print_colored(f"Removed dotfile: {dotfile.name}", "green")
         except ValidationError as e:
-            print(
-                colored(f"Error removing {dotfile.name}: {e.message}", "red")
-            )
+            print_colored(f"Error removing {dotfile.name}: {e.message}", "red")
 
     # Save the updated manifest
     with open(manifest_path, "w") as f:
         _ = f.write(dumpers[manifest_format](manifest))
 
-    print(
-        colored("Dotfiles removed and manifest updated successfully.", "green")
-    )
+    print_colored("Dotfiles removed and manifest updated successfully.", "green")
     persist_changes(manifest, manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
@@ -788,17 +760,15 @@ def revert(
         manifest_format (ManifestFormat): The format of the manifest file.
         sync (bool): Whether to sync the manifest after reverting.
     """
-    print(
-        colored(
-            "Reverting the manifest is experimental and may have bugs.",
-            "yellow",
-        )
+    print_colored(
+        "Reverting the manifest is experimental and may have bugs.",
+        "yellow",
     )
     if not questionary.confirm(
         "Are you sure you want to revert the manifest? (y/n)",
         default=True,
     ).ask():
-        print(colored("Revert cancelled.", "red"))
+        print_colored("Revert cancelled.", "red")
         return
     manifest_path, manifest_format = validate_manifest_path(
         manifest_path, manifest_format
@@ -882,13 +852,11 @@ def exec_(
     if with_command:
         if not shutil.which(with_command):
             raise ValidationError(f"Command {with_command} not found in PATH.")
-        print(
-            colored(f"Running command: {with_command} {dfloc_path}", "yellow")
-        )
+        print_colored(f"Running command: {with_command} {dfloc_path}", "yellow")
         _ = subprocess.run([with_command, str(dfloc_path)], check=True)
     else:
         with open(dfloc_path) as f:
-            print(colored(f.read(), "green"))
+            print_colored(f.read(), "green")
 
 
 @app.command
@@ -941,10 +909,8 @@ def init(
 
     persist_changes(manifest, source_path)
     manifest_path.symlink_to(source_path)
-    print(
-        colored(
-            f"Dotfile manager initialized with manifest at {manifest_path}.",
-            "green",
-        )
+    print_colored(
+        f"Dotfile manager initialized with manifest at {manifest_path}.",
+        "green",
     )
     _ = GitSyncer.from_manifest(manifest).instance
