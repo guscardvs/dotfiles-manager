@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from dotfile_manager.app import app
-from dotfile_manager.linker.pure import PureLinker
+from dotfile_manager.linker.default import DefaultLinker
 from dotfile_manager.manifest.loader import dumpers, loaders
 from dotfile_manager.manifest.schema import Dotfile, Manifest
 
@@ -25,7 +25,7 @@ class TestMapOrphanedFiles:
         _ = linked_file.write_text("linked")
         home = Path.home()
         linked_file_target = home / linked_file.name
-        linker = PureLinker(
+        linker = DefaultLinker(
             loaded_manifest,
             dfmanpath.with_suffix(f".{loaded_manifest.original_format}"),
         )

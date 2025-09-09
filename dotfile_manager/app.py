@@ -10,7 +10,7 @@ from cyclopts import App, Parameter
 from escudeiro.misc import autopath, next_or
 
 from dotfile_manager.constants import CONFIG_DIR, get_default_repository_path
-from dotfile_manager.linker.pure import USUAL_DOTFILES, PureLinker
+from dotfile_manager.linker.default import USUAL_DOTFILES, DefaultLinker
 from dotfile_manager.manifest.concepts import ManifestFormat
 from dotfile_manager.manifest.diffs import persist_changes
 from dotfile_manager.manifest.loader import (
@@ -158,7 +158,7 @@ def link(
         manifest_path, manifest_format
     )
     manifest = loaders[manifest_format](manifest_path)
-    linker = PureLinker(manifest=manifest)
+    linker = DefaultLinker(manifest=manifest)
     if not dotfiles:
         print_colored(
             "No dotfiles specified. Linking all dotfiles in the manifest.",
@@ -246,7 +246,7 @@ def from_system(
     )
     manifest = loaders[manifest_format](manifest_path)
     dotfiles = [load_path(df, Path.home()) for df in dotfiles]
-    linker = PureLinker(manifest=manifest)
+    linker = DefaultLinker(manifest=manifest)
     backups: list[tuple[Path, Path]] = linker.make_backups(dotfiles)
     try:
         linker.save_from_system(dotfiles)
@@ -549,7 +549,7 @@ def unlink(
         manifest_path, manifest_format
     )
     manifest = loaders[manifest_format](manifest_path)
-    linker = PureLinker(manifest=manifest)
+    linker = DefaultLinker(manifest=manifest)
     if not dotfiles:
         linker.unlink_all()
     else:
@@ -613,7 +613,7 @@ def remove(
         manifest_path, manifest_format
     )
     manifest = loaders[manifest_format](manifest_path)
-    linker = PureLinker(manifest=manifest)
+    linker = DefaultLinker(manifest=manifest)
 
     dfs: list[Dotfile] = []
     for df in map(autopath, dotfiles):
@@ -723,7 +723,7 @@ def map_orphaned_files(
         manifest_path, manifest_format
     )
     manifest = loaders[manifest_format](manifest_path)
-    linker = PureLinker(manifest=manifest, manifest_path=manifest_path)
+    linker = DefaultLinker(manifest=manifest, manifest_path=manifest_path)
     orphaned_files = linker.find_orphaned()
     if orphaned_files:
         linker.sync_orphaned(orphaned_files)

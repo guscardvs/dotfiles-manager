@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from pytest import CaptureFixture
 
 from dotfile_manager.app import app
-from dotfile_manager.linker.pure import PureLinker
+from dotfile_manager.linker.default import DefaultLinker
 from dotfile_manager.manifest.schema import Manifest, path_as_posix
 from dotfile_manager.utils import ValidationError
 
@@ -121,11 +121,11 @@ class TestFromSystem:
         questionary_confirm_mock.return_value.ask.return_value = False
         sample_file = randpath / "sample.txt"
         _ = sample_file.write_text("Sample content")
-        original_restore = PureLinker.restore_backups
+        original_restore = DefaultLinker.restore_backups
         call_count = 0
 
         def _restore_backups(
-            self: PureLinker, backups: list[tuple[Path, Path]]
+            self: DefaultLinker, backups: list[tuple[Path, Path]]
         ):
             nonlocal call_count
             call_count += 1
@@ -192,11 +192,11 @@ class TestFromSystem:
         questionary_confirm_mock.return_value.ask.return_value = False
         sample_file = randpath / "sample.txt"
         _ = sample_file.write_text("Sample content")
-        original_restore = PureLinker.restore_backups
+        original_restore = DefaultLinker.restore_backups
         call_count = 0
 
         def _restore_backups(
-            self: PureLinker, backups: list[tuple[Path, Path]]
+            self: DefaultLinker, backups: list[tuple[Path, Path]]
         ):
             nonlocal call_count
             call_count += 1

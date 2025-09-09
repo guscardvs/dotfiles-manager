@@ -29,7 +29,7 @@ USUAL_DOTFILES = (
 
 
 @data
-class PureLinker:
+class DefaultLinker:
     manifest: Manifest
     manifest_path: Path | None = None
 
