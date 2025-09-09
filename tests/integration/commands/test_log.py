@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from escudeiro.misc import autopath
 from git import Commit
 from pytest import CaptureFixture
@@ -8,12 +9,11 @@ from dotfile_manager.app import app
 from dotfile_manager.manifest.concepts import ManifestFormat
 from dotfile_manager.manifest.schema import Manifest
 from dotfile_manager.syncer.git import GitSyncer
-import pytest
 
 
 class TestLog:
     @pytest.fixture
-    def commit_instance(self, loaded_manifest: Manifest, dfmanpath: Path):
+    def commit_instance(self, loaded_manifest: Manifest):
         syncer = GitSyncer.from_manifest(loaded_manifest)
         root = autopath(loaded_manifest.root)
         _ = (root / "test1.txt").write_text("Test 1")

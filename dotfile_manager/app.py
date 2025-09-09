@@ -663,7 +663,9 @@ def remove(
     with open(manifest_path, "w") as f:
         _ = f.write(dumpers[manifest_format](manifest))
 
-    print_colored("Dotfiles removed and manifest updated successfully.", "green")
+    print_colored(
+        "Dotfiles removed and manifest updated successfully.", "green"
+    )
     persist_changes(manifest, manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
@@ -721,12 +723,16 @@ def map_orphaned_files(
         manifest_path, manifest_format
     )
     manifest = loaders[manifest_format](manifest_path)
-    linker = PureLinker(manifest=manifest)
+    linker = PureLinker(manifest=manifest, manifest_path=manifest_path)
     orphaned_files = linker.find_orphaned()
-    if not orphaned_files:
+    if orphaned_files:
+        linker.sync_orphaned(orphaned_files)
+    total_removed_refs = linker.remove_ghost_refs()
+    if not orphaned_files and total_removed_refs == 0:
+        print_colored(
+            "No changes to be made. Exiting...", "yellow"
+        )
         return
-    linker.sync_orphaned(orphaned_files)
-    linker.remove_ghost_refs()
     persist_changes(manifest, manifest_path)
     if sync:
         syncer = GitSyncer.from_manifest(manifest)
@@ -852,7 +858,9 @@ def exec_(
     if with_command:
         if not shutil.which(with_command):
             raise ValidationError(f"Command {with_command} not found in PATH.")
-        print_colored(f"Running command: {with_command} {dfloc_path}", "yellow")
+        print_colored(
+            f"Running command: {with_command} {dfloc_path}", "yellow"
+        )
         _ = subprocess.run([with_command, str(dfloc_path)], check=True)
     else:
         with open(dfloc_path) as f:

@@ -31,6 +31,18 @@ USUAL_DOTFILES = (
 @data
 class PureLinker:
     manifest: Manifest
+    manifest_path: Path | None = None
+
+    def _make_dfman_path(self) -> Path:
+        if self.manifest_path:
+            if not self.manifest_path.is_relative_to(self.manifest.root):
+                return self.manifest.root / self.manifest_path.name
+            else:
+                return self.manifest_path
+        else:
+            return (
+                self.manifest.root / f"dfman.{self.manifest.original_format}"
+            )
 
     def link(self, dotfile: Dotfile) -> None:
         """
@@ -262,12 +274,7 @@ class PureLinker:
             if item.is_dir() and item.name == ".git":
                 # Skip the .git directory
                 continue
-            if (
-                item.is_file()
-                and item
-                == self.manifest.root
-                / f"dfman.{self.manifest.original_format}"
-            ):
+            if item.is_file() and item == self._make_dfman_path():
                 # Skip the manifest file itself
                 continue
             if self._is_orphaned(item):
@@ -329,9 +336,10 @@ class PureLinker:
                 dflocation=file.relative_to(self.manifest.root).as_posix(),
                 description=f"Unmanaged dotfile for {file.name}",
             )
-            if (
-                not likely_location.is_symlink() and likely_location.exists()
-            ) or likely_location.resolve() != file.resolve():
+            if likely_location.exists() and (
+                not likely_location.is_symlink()
+                or (likely_location.resolve() != file.resolve())
+            ):
                 print_colored(
                     f"Dotfile is broken: {dotfile.dflocation} -> ({likely_location.as_posix()}), not fixing it.",
                     "red",
@@ -347,7 +355,7 @@ class PureLinker:
 
         print_colored("Unmanaged files and directories synced.", "green")
 
-    def remove_ghost_refs(self) -> None:
+    def remove_ghost_refs(self) -> int:
         """
         Remove entries in the manifest that are not present in the manifest root.
         """
@@ -387,6 +395,7 @@ class PureLinker:
             print_colored(
                 "No ghost references found in the manifest.", "green"
             )
+        return removed_count
 
     def make_backups(self, files: list[Path]) -> list[tuple[Path, Path]]:
         """
