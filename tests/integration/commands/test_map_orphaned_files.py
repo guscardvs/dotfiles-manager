@@ -29,7 +29,7 @@ class TestMapOrphanedFiles:
             loaded_manifest,
             dfmanpath.with_suffix(f".{loaded_manifest.original_format}"),
         )
-        with patch("dotfile_manager.linker.pure.print_colored"):
+        with patch("dotfile_manager.linker.default.print_colored"):
             _ = linker._link_direct( # pyright: ignore[reportPrivateUsage]
                 Dotfile(
                     name=linked_file.name,

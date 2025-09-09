@@ -134,7 +134,7 @@ class TestFromSystem:
         with (
             patch("dotfile_manager.app.persist_changes") as mock_persist,
             patch(
-                "dotfile_manager.app.PureLinker.restore_backups",
+                "dotfile_manager.app.DefaultLinker.restore_backups",
                 new=_restore_backups,
             ),
         ):
@@ -205,7 +205,7 @@ class TestFromSystem:
         with (
             patch("dotfile_manager.app.persist_changes") as mock_persist,
             patch(
-                "dotfile_manager.app.PureLinker.restore_backups",
+                "dotfile_manager.app.DefaultLinker.restore_backups",
                 new=_restore_backups,
             ),
         ):
