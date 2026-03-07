@@ -1,12 +1,12 @@
 [project]
 name = "dfman"
-version = "0.1.1"
+version = "0.1.2"
 description = "A tool to manage and synchronize dotfiles across multiple systems."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "cyclopts>=3.19.0",
-    "escudeiro>=0.2.17",
+    "escudeiro>=0.4.0",
     "gitpython>=3.1.44",
     "questionary>=2.1.0",
     "ruamel-yaml>=0.18.14",
